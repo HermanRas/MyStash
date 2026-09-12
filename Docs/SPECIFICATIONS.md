@@ -84,7 +84,7 @@ App/Data/{user}/videos/Video{ID}/{ID}.json.enc                # encrypted per-vi
 App/Data/{user}/videos/Video{ID}/{ID}.mp4.enc.old             # transient safety copy during re-encryption only
 ```
 
-**Current state:** `App/Data/TestUser/videos/1.mp4` exists as a raw (unencrypted, un-ingested) sample fixture — a 2.3MB standard MP4 used to exercise the ffmpeg/7z pipeline in Phase 0 and the ingestion pipeline in Phase 3. It is not yet in the `Video{ID}/...enc` layout above; that conversion happens once the upload/ingestion code in Phase 3 runs against it.
+**Current state:** `App/Data/TestUser/videos/1.mp4` remains as a raw (unencrypted) sample fixture used to exercise the ffmpeg/7z pipeline directly (Phase 0 smoke test) and as upload input for manual testing — it is not itself part of the datastore layout. `App/bin/seed_testuser.php` seeds `TestUser.json.enc` with 6 sample video index entries (password `testpass123`) so login/wall have real data to render; uploads through `App/public/upload.php` create real `Video{ID}/...enc` entries following the layout above, as verified during Phase 3.
 
 ## 4. UI/UX & Layout Specification
 

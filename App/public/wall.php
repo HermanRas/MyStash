@@ -46,6 +46,7 @@ function creatorLabel(array $creators, string $name): string
   </div>
 
   <div class="header-actions">
+    <button class="icon-btn" id="upload-toggle" aria-expanded="false" aria-controls="upload-panel">+ Upload</button>
     <button class="icon-btn" id="filters-toggle" aria-expanded="false" aria-controls="filter-panel">Filters</button>
     <div class="user-menu" tabindex="0">
       <div class="user-menu-trigger">
@@ -71,6 +72,20 @@ function creatorLabel(array $creators, string $name): string
     <span class="pill"><?= htmlspecialchars($name, ENT_QUOTES) ?></span>
   <?php endforeach; ?>
 </nav>
+
+<div class="upload-panel" id="upload-panel">
+  <form action="upload.php" method="post" enctype="multipart/form-data">
+    <div class="field">
+      <label for="video-file">Video file</label>
+      <input type="file" id="video-file" name="video" accept="video/*" required>
+    </div>
+    <div class="field">
+      <label for="preview-at">Preview capture time, seconds (optional — defaults to 15s)</label>
+      <input type="number" id="preview-at" name="preview_at" min="0" step="1" placeholder="15">
+    </div>
+    <button type="submit" class="btn" style="width:auto; padding:8px 24px;">Upload</button>
+  </form>
+</div>
 
 <div class="layout">
   <aside class="filter-panel" id="filter-panel">
@@ -142,6 +157,13 @@ function creatorLabel(array $creators, string $name): string
   toggle.addEventListener('click', () => {
     const isOpen = panel.classList.toggle('open');
     toggle.setAttribute('aria-expanded', String(isOpen));
+  });
+
+  const uploadToggle = document.getElementById('upload-toggle');
+  const uploadPanel = document.getElementById('upload-panel');
+  uploadToggle.addEventListener('click', () => {
+    const isOpen = uploadPanel.classList.toggle('open');
+    uploadToggle.setAttribute('aria-expanded', String(isOpen));
   });
 
   document.querySelectorAll('.filter-panel input[type="range"]').forEach((input) => {

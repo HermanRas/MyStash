@@ -55,6 +55,42 @@ final class Datastore
         return self::DATA_ROOT . "/{$user}/videos/{$user}.json.enc";
     }
 
+    public static function videoDir(string $user, string $id): string
+    {
+        return self::DATA_ROOT . "/{$user}/videos/Video{$id}";
+    }
+
+    /**
+     * One more than the highest existing numeric video ID in the index.
+     */
+    public static function nextVideoId(array $index): string
+    {
+        $max = 0;
+        foreach ($index['videos'] ?? [] as $video) {
+            $max = max($max, (int) $video['id']);
+        }
+
+        return (string) ($max + 1);
+    }
+
+    /**
+     * Creates a fresh, empty tmpfs working directory under a caller-chosen
+     * namespace (e.g. "ingest") for staging plaintext before encryption.
+     * Callers must clean up with self::wipe() when done.
+     */
+    public static function tmpfsWorkDir(string $namespace): string
+    {
+        $root = "/dev/shm/mystash-{$namespace}";
+        if (!is_dir($root)) {
+            mkdir($root, 0700, true);
+        }
+
+        $dir = $root . '/' . bin2hex(random_bytes(8));
+        mkdir($dir, 0700, true);
+
+        return $dir;
+    }
+
     /**
      * Attempts to decrypt and parse the user's video index with the given
      * password. Returns null on any failure (unknown user, wrong password,
@@ -93,7 +129,7 @@ final class Datastore
 
             return is_array($data) ? $data : null;
         } finally {
-            $this->wipe($extractDir);
+            self::wipe($extractDir);
         }
     }
 
@@ -122,11 +158,11 @@ final class Datastore
 
             return $this->crypto->encrypt($plainPath, $this->indexArchivePath($user), $password);
         } finally {
-            $this->wipe($workDir);
+            self::wipe($workDir);
         }
     }
 
-    private function wipe(string $dir): void
+    public static function wipe(string $dir): void
     {
         if (!is_dir($dir)) {
             return;

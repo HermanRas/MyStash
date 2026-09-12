@@ -8,5 +8,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY . /app
+COPY php.ini /usr/local/etc/php/conf.d/mystash.ini
 
 CMD ["php", "-S", "0.0.0.0:8080", "-t", "/app/public"]

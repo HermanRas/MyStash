@@ -46,6 +46,45 @@ final class VideoEncoder
             && $this->videoCodec($inputPath) === 'hevc';
     }
 
+    public function durationSeconds(string $inputPath): ?float
+    {
+        $command = [
+            $this->ffprobe,
+            '-v', 'error',
+            '-show_entries', 'format=duration',
+            '-of', 'default=noprint_wrappers=1:nokey=1',
+            $inputPath,
+        ];
+
+        [$exitCode, $stdout] = $this->run($command);
+
+        if ($exitCode !== 0 || trim($stdout) === '') {
+            return null;
+        }
+
+        return (float) trim($stdout);
+    }
+
+    public function videoHeight(string $inputPath): ?int
+    {
+        $command = [
+            $this->ffprobe,
+            '-v', 'error',
+            '-select_streams', 'v:0',
+            '-show_entries', 'stream=height',
+            '-of', 'default=noprint_wrappers=1:nokey=1',
+            $inputPath,
+        ];
+
+        [$exitCode, $stdout] = $this->run($command);
+
+        if ($exitCode !== 0 || trim($stdout) === '') {
+            return null;
+        }
+
+        return (int) trim($stdout);
+    }
+
     /**
      * Converts $inputPath to MP4/H.265 at $outputPath.
      */

@@ -36,13 +36,13 @@ Verified by serving `App/public/` via `docker compose up` and screenshotting all
 
 ## Phase 3 — Upload & Ingestion Pipeline
 
-- [ ] 3.1 Upload endpoint: accept video file, assign `{ID}`, create `Video{ID}/` directory
-- [ ] 3.2 Format check: tag `not converted` if not MP4/H.265 (use ffprobe)
-- [ ] 3.3 Preview image generation: extract frame at 15s default (or user-chosen timestamp) via ffmpeg
-- [ ] 3.4 Preview clip generation: short silent low-bitrate clip via ffmpeg
-- [ ] 3.5 Encrypt generated artifacts (mp4, preview clip, preview image, metadata) into the datastore layout (Phase 0.5)
-- [ ] 3.6 Update `{user}.json.enc` index with the new video entry
-- [ ] 3.7 Wire `wall.html` uploads flow end-to-end with a real file
+- [x] 3.1 Upload endpoint: accept video file, assign `{ID}`, create `Video{ID}/` directory — `App/public/upload.php`, `App/src/VideoIngest.php`, `Datastore::nextVideoId()`/`videoDir()`
+- [x] 3.2 Format check: tag `not converted` if not MP4/H.265 (use ffprobe) — `VideoIngest::ingest()`, adds `Not Converted` to categories
+- [x] 3.3 Preview image generation: extract frame at 15s default (or user-chosen timestamp) via ffmpeg — wired to the upload form's optional "preview at" field
+- [x] 3.4 Preview clip generation: short silent low-bitrate clip via ffmpeg
+- [x] 3.5 Encrypt generated artifacts (mp4, preview clip, preview image, metadata) into the datastore layout (Phase 0.5)
+- [x] 3.6 Update `{user}.json.enc` index with the new video entry — `Datastore::saveIndex()` called from `upload.php`, session index updated too
+- [x] 3.7 Wire `wall.html` uploads flow end-to-end with a real file — `+ Upload` panel on `wall.php`; verified via curl multipart upload: files land in `Video{ID}/`, decrypt back to byte-identical content, metadata correct (codec/not_converted/preview), new tile appears on the wall
 
 ## Phase 4 — Video & Creator Management
 
