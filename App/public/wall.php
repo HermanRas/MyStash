@@ -116,8 +116,10 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
         </div>
       </div>
 
-      <button type="submit" class="btn" style="width:100%;">Apply Filters</button>
-      <a class="btn secondary" style="width:100%; margin-top:8px; display:block; text-align:center; box-sizing:border-box;" href="wall.php">Reset Filters</a>
+      <?php /* No Apply button — the form submits on change (see below). No
+               Reset either: "All Videos" in the top nav is the bare wall URL,
+               which is the same thing. */ ?>
+      <noscript><button type="submit" class="btn" style="width:100%;">Apply Filters</button></noscript>
     </form>
   </aside>
 
@@ -192,6 +194,12 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
   uploadToggle.addEventListener('click', () => {
     const isOpen = uploadPanel.classList.toggle('open');
     uploadToggle.setAttribute('aria-expanded', String(isOpen));
+  });
+
+  // Filters apply on change rather than behind an Apply button. Sliders fire
+  // `change` when released (not on every pixel), so this doesn't reload mid-drag.
+  document.getElementById('filter-form').addEventListener('change', (event) => {
+    event.currentTarget.submit();
   });
 
   const maxMinutes = <?= VideoQuery::MAX_LENGTH_MINUTES ?>;

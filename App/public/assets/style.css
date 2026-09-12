@@ -7,6 +7,8 @@
   --text-muted: #888888;
   --accent: #ffa31a;
   --border: #333333;
+  /* One scale for every inline UI icon (nav pills, menus, buttons). */
+  --icon-size: 28px;
 }
 
 * {
@@ -131,27 +133,30 @@ a {
    knocked back to the dark ink colour instead (brightness(0) does that
    without needing a second set of files). */
 .user-menu-trigger .avatar img {
-  width: 17px;
-  height: 17px;
+  width: 19px;
+  height: 19px;
   object-fit: contain;
   filter: brightness(0);
   opacity: 0.75;
 }
 
-.menu-icon {
-  width: 15px;
-  height: 15px;
+/* One size for every UI icon — they were 14px in buttons and 15px in menus
+   and pills, which read as an accident rather than a hierarchy. */
+.menu-icon,
+.pill-icon,
+.btn-icon {
+  width: var(--icon-size);
+  height: var(--icon-size);
   object-fit: contain;
-  vertical-align: -3px;
-  margin-right: 9px;
+  vertical-align: -8px;
+}
+
+.menu-icon {
+  margin-right: 10px;
 }
 
 .pill-icon {
-  width: 15px;
-  height: 15px;
-  object-fit: contain;
-  vertical-align: -3px;
-  margin-right: 7px;
+  margin-right: 8px;
 }
 
 .pill.active .pill-icon,
@@ -160,11 +165,7 @@ a {
 }
 
 .btn-icon {
-  width: 14px;
-  height: 14px;
-  object-fit: contain;
-  vertical-align: -2px;
-  margin-right: 6px;
+  margin-right: 8px;
 }
 
 .btn .btn-icon {
@@ -184,7 +185,8 @@ a {
   border: 1px solid var(--border);
   border-top: 8px solid transparent;
   border-radius: 8px;
-  min-width: 180px;
+  /* Wide enough that no item wraps now the icons are full size. */
+  min-width: 240px;
   overflow: hidden;
 }
 
@@ -194,10 +196,12 @@ a {
 }
 
 .user-menu-dropdown a {
-  display: block;
+  display: flex;
+  align-items: center;
   padding: 10px 16px;
   font-size: 13px;
   color: var(--text);
+  white-space: nowrap;
 }
 
 .user-menu-dropdown a:hover {
@@ -324,7 +328,10 @@ a {
   accent-color: var(--accent);
 }
 
-.filter-row select {
+/* Every select is themed here rather than per-page: left to the browser they
+   render as white native controls, which is what they were doing on the video
+   edit screen. */
+select {
   width: 100%;
   background: var(--surface-alt);
   border: 1px solid var(--border);
@@ -332,6 +339,24 @@ a {
   border-radius: 6px;
   padding: 8px 10px;
   font-size: 13px;
+  font-family: inherit;
+  /* Native appearance would bring back the light chrome on some platforms. */
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+                    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position: calc(100% - 15px) center, calc(100% - 10px) center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 28px;
+}
+
+select:focus {
+  outline: 2px solid var(--accent);
+}
+
+select option {
+  background: var(--surface);
+  color: var(--text);
 }
 
 /* ---------- Media Grid ---------- */
@@ -562,8 +587,8 @@ a {
 
 /* Small inline icons must not inherit the auth card's 40px logo sizing. */
 .form-card .btn-icon {
-  width: 14px;
-  height: 14px;
+  width: var(--icon-size);
+  height: var(--icon-size);
 }
 
 .form-card .hint a {
@@ -659,11 +684,22 @@ a {
 
 /* ---------- Video Watch Page ---------- */
 
+/* Single column: the title leads, then the player, then meta, categories and
+   the creator — no side rail. */
 .watch-layout {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 24px;
+  max-width: 980px;
   padding: 24px;
+}
+
+.creator-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 420px;
+}
+
+.creator-strip:hover {
+  border-color: var(--accent);
 }
 
 .player {
@@ -688,9 +724,9 @@ a {
 }
 
 .watch-title {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
-  margin: 16px 0 6px;
+  margin: 0 0 14px;
 }
 
 .watch-meta {

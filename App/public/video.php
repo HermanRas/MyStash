@@ -63,6 +63,8 @@ $navActive = 'videos';
 
 <main class="watch-layout">
   <div>
+    <h1 class="watch-title"><?= htmlspecialchars($video['title'], ENT_QUOTES) ?></h1>
+
     <div class="player" id="player" data-video-src="media.php?id=<?= urlencode($id) ?>&amp;type=video">
       <img src="media.php?id=<?= urlencode($id) ?>&amp;type=thumb" alt="" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover;" onerror="this.style.display='none'">
       <button type="button" id="player-play" style="position:relative; z-index:1; background:rgba(0,0,0,0.6); border:1px solid var(--border); color:#fff; border-radius:50%; width:64px; height:64px; font-size:20px; cursor:pointer;">▶</button>
@@ -72,10 +74,9 @@ $navActive = 'videos';
       <p class="hint" style="color:#ff6b6b;">Conversion failed — no encrypted video file exists for this entry yet (seed/demo data has no real media behind it).</p>
     <?php endif; ?>
 
-    <div class="watch-title"><?= htmlspecialchars($video['title'], ENT_QUOTES) ?></div>
     <div class="watch-meta">
-      <?= (int) $video['views'] ?> views • <?= formatLength((int) $video['length_seconds']) ?> •
-      Uploaded by <strong><?= htmlspecialchars($video['creator'], ENT_QUOTES) ?></strong>
+      <?= (int) $video['views'] ?> views • <?= formatLength((int) $video['length_seconds']) ?>
+      <?php if (!empty($video['quality'])): ?> • <?= htmlspecialchars($video['quality'], ENT_QUOTES) ?><?php endif; ?>
       <?php if (!empty($video['not_converted'])): ?>
         • <span style="color:#cc4444;">Not Converted</span>
       <?php endif; ?>
@@ -90,6 +91,20 @@ $navActive = 'videos';
         </button>
       <?php endforeach; ?>
     </div>
+
+    <?php /* The creator sits below the categories rather than in a side rail. */ ?>
+    <div class="section-title">Creator</div>
+    <a class="card creator-strip" href="creator.php?edit=<?= urlencode($video['creator']) ?>">
+      <div class="creator-avatar" style="width:56px; height:56px; margin:0;">
+        <?php if ($creatorAvatar !== null): ?>
+          <img src="<?= htmlspecialchars($creatorAvatar, ENT_QUOTES) ?>" alt="">
+        <?php endif; ?>
+      </div>
+      <div>
+        <div class="creator-name"><?= htmlspecialchars($video['creator'], ENT_QUOTES) ?></div>
+        <div class="creator-meta"><?= htmlspecialchars($creators[$video['creator']]['bio'] ?? '', ENT_QUOTES) ?: 'no bio set' ?></div>
+      </div>
+    </a>
 
     <?php if (!$editing): ?>
       <a class="btn secondary" style="width:auto; margin-top:16px; padding:8px 20px; display:inline-block;" href="video.php?id=<?= urlencode($id) ?>&edit=1">Edit Video</a>
@@ -179,21 +194,6 @@ $navActive = 'videos';
       </form>
     <?php endif; ?>
   </div>
-
-  <aside>
-    <div class="section-title">Creator</div>
-    <div class="card" style="display:flex; align-items:center; gap:12px;">
-      <div class="creator-avatar" style="width:56px; height:56px; margin:0;">
-        <?php if ($creatorAvatar !== null): ?>
-          <img src="<?= htmlspecialchars($creatorAvatar, ENT_QUOTES) ?>" alt="">
-        <?php endif; ?>
-      </div>
-      <div>
-        <div class="creator-name"><?= htmlspecialchars($video['creator'], ENT_QUOTES) ?></div>
-        <div class="creator-meta"><?= htmlspecialchars($creators[$video['creator']]['bio'] ?? '', ENT_QUOTES) ?: 'no bio set' ?></div>
-      </div>
-    </div>
-  </aside>
 </main>
 
 <script>
