@@ -55,6 +55,13 @@ Verified by serving `App/public/` via `docker compose up` and screenshotting all
 
 All verified end-to-end via curl (edit/rename/delete/convert/tag add-delete/category add-delete) and screenshots of the rendered pages; datastore reset to the clean seed afterward.
 
+### Phase 4 follow-ups (from review)
+
+- [x] 4.6 Categories reworked to the model in SPECIFICATIONS.md §2.7: global definitions (name + colour) in `{user}.json`, per-video assignments (category + `hh:mm:ss` timestamp) in `{ID}.json`, the same category assignable more than once, and the wall filter populated from the global list. Replaces the old split between plain "categories" and separate "timestamp tags" (`App/src/VideoCategories.php`, `video_category_add.php`/`video_category_delete.php`). `App/bin/migrate_categories.php` converts existing datastores.
+- [x] 4.7 Category chips on the watch page seek the player to their timestamp.
+- [x] 4.8 Fixed: the user dropdown closed when the pointer crossed the gap below the trigger — the gap is now a transparent top border on the menu, so it stays within the hover target.
+- [x] 4.9 Fixed: a deleted video could reappear on the wall. Delete was correct; the cause was that every write saved the session's login-time copy of the whole index, so a second session could revert the first's changes. All pages/endpoints now re-read the index from disk first (`Session::refreshIndex()`), and the migration prunes index entries left with no media behind them.
+
 ## Phase 5 — Search, Filter, Sort, Playlists
 
 - [ ] 5.1 Video search by title, creator, category tags

@@ -29,7 +29,7 @@ $previewAt = isset($_POST['preview_at']) && $_POST['preview_at'] !== ''
     ? (float) $_POST['preview_at']
     : null;
 
-$index = Session::index();
+$index = Session::refreshIndex();
 
 $entry = (new VideoIngest())->ingest(
     Session::user(),

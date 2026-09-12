@@ -8,7 +8,7 @@ use MyStash\Session;
 
 Session::requireLogin();
 
-$index = Session::index();
+$index = Session::refreshIndex();
 $creators = $index['creators'] ?? [];
 $categories = $index['categories'] ?? [];
 $videos = $index['videos'] ?? [];

@@ -60,7 +60,7 @@ try {
 
     $crypto->encrypt($convertedPath, $archivePath, $password);
 
-    $index = Session::index();
+    $index = Session::refreshIndex();
     foreach ($index['videos'] as &$video) {
         if ($video['id'] === $id) {
             $video['format'] = 'mp4';

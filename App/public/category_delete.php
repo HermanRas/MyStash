@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/../src/Crypto7z.php';
-require __DIR__ . '/../src/Datastore.php';
-require __DIR__ . '/../src/Session.php';
+require_once __DIR__ . '/../src/Session.php';
+require_once __DIR__ . '/../src/VideoCategories.php';
 
 use MyStash\Datastore;
 use MyStash\Session;
+use MyStash\VideoCategories;
 
 Session::requireLogin();
 
@@ -23,16 +23,12 @@ if ($name === '') {
     exit;
 }
 
-$index = Session::index();
+$index = Session::refreshIndex();
 
 unset($index['categories'][$name]);
+(new VideoCategories())->removeCategoryEverywhere(Session::user(), Session::password(), $name, $index);
 
-foreach ($index['videos'] as &$video) {
-    $video['categories'] = array_values(array_diff($video['categories'], [$name]));
-}
-unset($video);
-
-Session::setIndex($index);
 (new Datastore())->saveIndex(Session::user(), Session::password(), $index);
+Session::setIndex($index);
 
 header('Location: creator.php');

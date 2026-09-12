@@ -24,7 +24,7 @@ if ($name === '') {
     exit;
 }
 
-$index = Session::index();
+$index = Session::refreshIndex();
 $creators = $index['creators'] ?? [];
 
 $record = [

@@ -1,17 +1,22 @@
 const { chromium } = require('playwright');
 
 const BASE = process.env.BASE_URL || 'http://app:8080';
-const ID = process.env.VIDEO_ID || '9';
+const ID = process.env.VIDEO_ID || '8';
 
+/**
+ * Diagnostic: does clicking a category chip create the player and request a
+ * seek to that timestamp? Note the Playwright image's Chromium ships without
+ * H.264/HEVC decoders, so the media never reaches readyState >= 1 here and the
+ * seek stays pending — that part needs a codec-capable browser to observe.
+ */
 (async () => {
   const browser = await chromium.launch();
   const page = await browser.newPage();
 
   page.on('console', (msg) => console.log('CONSOLE:', msg.type(), msg.text()));
-  page.on('requestfailed', (req) => console.log('REQUEST FAILED:', req.url(), req.failure()?.errorText));
   page.on('response', (res) => {
     if (res.url().includes('media.php')) {
-      console.log('RESPONSE:', res.status(), res.url(), res.headers()['content-type']);
+      console.log('RESPONSE:', res.status(), res.url().replace(BASE, ''), res.headers()['content-type']);
     }
   });
 
@@ -22,23 +27,28 @@ const ID = process.env.VIDEO_ID || '9';
   await page.waitForSelector('.video-grid');
 
   await page.goto(`${BASE}/video.php?id=${ID}`, { waitUntil: 'networkidle' });
-  await page.click('#player-play');
-  await page.waitForTimeout(2000);
+
+  const chips = page.locator('.tag-jump');
+  console.log('category chips on the page:', await chips.count());
+
+  // Click the last chip (the one with a non-zero timestamp).
+  const target = chips.last();
+  console.log('clicking chip:', (await target.innerText()).replace(/\s+/g, ' ').trim());
+  await target.click();
+  await page.waitForTimeout(1500);
 
   const state = await page.evaluate(() => {
     const v = document.querySelector('#player video');
     return v ? {
-      src: v.src,
-      paused: v.paused,
-      currentTime: v.currentTime,
+      created: true,
+      src: v.src.split('/').pop(),
+      requestedSeekPending: v.readyState < 1,
       readyState: v.readyState,
-      networkState: v.networkState,
-      error: v.error ? { code: v.error.code, message: v.error.message } : null,
-      canPlayMp4H264: v.canPlayType('video/mp4; codecs="avc1.42E01E"'),
-      canPlayMp4Hevc: v.canPlayType('video/mp4; codecs="hvc1"'),
-    } : null;
+      error: v.error ? v.error.message : null,
+      canPlayH264: v.canPlayType('video/mp4; codecs="avc1.42E01E"') || '(unsupported)',
+    } : { created: false };
   });
-  console.log('STATE:', JSON.stringify(state, null, 2));
+  console.log('PLAYER STATE:', JSON.stringify(state, null, 2));
 
   await browser.close();
 })();

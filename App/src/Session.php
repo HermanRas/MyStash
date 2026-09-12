@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace MyStash;
 
+require_once __DIR__ . '/Crypto7z.php';
+require_once __DIR__ . '/Datastore.php';
+
 /**
  * Starts a PHP session backed by tmpfs (/dev/shm) instead of the default
  * on-disk session save path. The session carries the user's password for
@@ -80,5 +83,25 @@ final class Session
     public static function setIndex(array $index): void
     {
         $_SESSION['index'] = $index;
+    }
+
+    /**
+     * Re-reads the index from disk and refreshes the session copy.
+     *
+     * Every page and endpoint must start from this rather than the snapshot
+     * taken at login: the whole index is written back on each change, so a
+     * session working from a stale copy would silently revert changes made in
+     * another session (which is exactly how a deleted video reappeared on the
+     * wall once). Falls back to the session copy if the archive can't be read.
+     */
+    public static function refreshIndex(): array
+    {
+        $index = (new Datastore())->loadIndex(self::user(), self::password());
+
+        if ($index !== null) {
+            $_SESSION['index'] = $index;
+        }
+
+        return $_SESSION['index'];
     }
 }

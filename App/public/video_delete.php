@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $id = (string) ($_POST['id'] ?? '');
-$index = Session::index();
+$index = Session::refreshIndex();
 
 $index['videos'] = array_values(array_filter(
     $index['videos'],

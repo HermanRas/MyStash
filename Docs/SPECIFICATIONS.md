@@ -27,7 +27,9 @@
 4. Success = login. Failure (bad path or bad password) = rejected, no further detail given.
 5. Once logged in, the app reads the decrypted video index from `{user}.json.enc` and renders the video wall.
 
-**Session storage:** the password (and the decrypted index, kept for the session so it isn't re-decrypted on every request) live in a PHP session — but the session store itself is redirected to tmpfs (`/dev/shm`, RAM-backed) instead of PHP's default on-disk session path, so the password never touches persistent disk. It's gone on logout or container restart. See `App/src/Session.php`.
+**Session storage:** the password (and a cached copy of the decrypted index) live in a PHP session — but the session store itself is redirected to tmpfs (`/dev/shm`, RAM-backed) instead of PHP's default on-disk session path, so the password never touches persistent disk. It's gone on logout or container restart. See `App/src/Session.php`.
+
+**Index freshness:** every page and endpoint re-reads the index from disk (`Session::refreshIndex()`) rather than trusting the copy taken at login. Because each change rewrites the whole index, a session working from a login-time snapshot would silently revert changes made in another session — that is exactly how a deleted video reappeared on the wall once.
 
 ### 2.2 Video Wall Load
 
@@ -63,7 +65,21 @@
 3. Order of operations: reprocess all video files first, then update `{user}.json.enc` last.
 4. While reprocessing, the previous encrypted file is kept as `Video{ID}/{ID}.mp4.enc.old` until the run completes successfully, then removed.
 
-### 2.7 Search / Filter / Sort
+### 2.7 Categories
+
+Categories work like creators: they are **global definitions** (name + colour) managed once per user, and videos *reference* them.
+
+- **Definitions** live in the index (`{user}.json`) as `{"<name>": "<hex colour>"}` and are managed on the Creators screen.
+- **Assignments** live in the video's own metadata (`Video{ID}/{ID}.json`) as `{"name": "<category>", "timestamp_seconds": N}`.
+- Each assignment carries a timestamp (`hh:mm:ss`, default `00:00:00`) so a category can point at a specific moment; clicking it on the watch page seeks the player there.
+- The **same category may be assigned multiple times** at different timestamps. Only the exact same category at the exact same timestamp is rejected as a duplicate.
+- On the video edit screen you pick a category from the global list — categories can't be invented ad hoc per video.
+- Deleting a global category removes every assignment of it across all videos.
+- The wall's filter list is populated from the global definitions.
+
+The index also keeps a **de-duplicated copy of each video's category names** on its entry. That copy is derived, not authoritative: it exists so the wall grid and its filters can render without decrypting every video's metadata archive on each page load.
+
+### 2.8 Search / Filter / Sort
 
 - **Search:** videos by title, creator, category tags.
 - **Filter:** creators by age, gender, other details.
@@ -84,7 +100,7 @@ App/Data/{user}/videos/Video{ID}/{ID}.json.enc                # encrypted per-vi
 App/Data/{user}/videos/Video{ID}/{ID}.mp4.enc.old             # transient safety copy during re-encryption only
 ```
 
-**Current state:** `App/Data/TestUser/videos/1.mp4` remains as a raw (unencrypted) sample fixture used to exercise the ffmpeg/7z pipeline directly (Phase 0 smoke test) and as upload input for manual testing — it is not itself part of the datastore layout. `App/bin/seed_testuser.php` seeds `TestUser.json.enc` with 6 sample video index entries (password `testpass123`) so login/wall have real data to render; uploads through `App/public/upload.php` create real `Video{ID}/...enc` entries following the layout above, as verified during Phase 3.
+**Current state:** `App/Data/TestUser/videos/1.mp4` remains as a raw (unencrypted) sample fixture used to exercise the ffmpeg/7z pipeline directly (Phase 0 smoke test) and as upload input for manual testing — it is not itself part of the datastore layout. `App/bin/seed_testuser.php` seeds `TestUser.json.enc` plus a `{ID}.json.enc` per demo entry (password `testpass123`); it **merges**, so re-running it refreshes the demo rows without touching real uploads. Demo entries carry metadata only — no media files — so playback/conversion for them reports "no encrypted video file". Uploads through `App/public/upload.php` create complete `Video{ID}/...enc` entries following the layout above.
 
 ## 4. UI/UX & Layout Specification
 

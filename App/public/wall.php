@@ -8,7 +8,7 @@ use MyStash\Session;
 
 Session::requireLogin();
 
-$index = Session::index();
+$index = Session::refreshIndex();
 $videos = $index['videos'] ?? [];
 $categories = $index['categories'] ?? [];
 $creators = $index['creators'] ?? [];
@@ -99,6 +99,19 @@ function creatorLabel(array $creators, string $name): string
         <label>Shorter than <output id="len-max-out">60m</output></label>
         <input type="range" id="len-max" min="0" max="60" step="1" value="60">
       </div>
+    </div>
+
+    <div class="filter-section">
+      <h4>Categories</h4>
+      <?php foreach ($categories as $name => $color): ?>
+        <div class="filter-row">
+          <label style="font-weight:normal; justify-content:flex-start; gap:8px;">
+            <input type="checkbox" name="category[]" value="<?= htmlspecialchars($name, ENT_QUOTES) ?>">
+            <span class="dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:<?= htmlspecialchars($color, ENT_QUOTES) ?>"></span>
+            <?= htmlspecialchars($name, ENT_QUOTES) ?>
+          </label>
+        </div>
+      <?php endforeach; ?>
     </div>
 
     <div class="filter-section">

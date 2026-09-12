@@ -23,7 +23,7 @@ if ($name === '' || $name === 'default') {
     exit;
 }
 
-$index = Session::index();
+$index = Session::refreshIndex();
 
 unset($index['creators'][$name]);
 

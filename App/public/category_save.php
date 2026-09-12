@@ -24,7 +24,7 @@ if ($name === '' || !preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
     exit;
 }
 
-$index = Session::index();
+$index = Session::refreshIndex();
 $index['categories'][$name] = $color;
 
 Session::setIndex($index);

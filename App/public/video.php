@@ -2,40 +2,38 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/../src/Session.php';
+require_once __DIR__ . '/../src/Session.php';
+require_once __DIR__ . '/../src/VideoCategories.php';
 
 use MyStash\Session;
+use MyStash\VideoCategories;
 
 Session::requireLogin();
 
-$index = Session::index();
+$index = Session::refreshIndex();
 $videos = $index['videos'] ?? [];
 $creators = $index['creators'] ?? [];
 $categories = $index['categories'] ?? [];
 
 $id = (string) ($_GET['id'] ?? '');
-$videoIndexPos = null;
-foreach ($videos as $pos => $v) {
+
+$video = null;
+foreach ($videos as $v) {
     if ($v['id'] === $id) {
-        $videoIndexPos = $pos;
+        $video = $v;
         break;
     }
 }
 
-if ($videoIndexPos === null) {
+if ($video === null) {
     header('Location: wall.php');
     exit;
 }
 
-$video = $videos[$videoIndexPos];
 $editing = isset($_GET['edit']);
+$assignments = (new VideoCategories())->load(Session::user(), Session::password(), $id);
 
 function formatLength(int $seconds): string
-{
-    return sprintf('%02d:%02d', intdiv($seconds, 60), $seconds % 60);
-}
-
-function formatTimestamp(int $seconds): string
 {
     return sprintf('%02d:%02d', intdiv($seconds, 60), $seconds % 60);
 }
@@ -94,18 +92,12 @@ function formatTimestamp(int $seconds): string
     </div>
 
     <div>
-      <?php foreach ($video['categories'] as $cat): ?>
-        <span class="tag">
-          <span class="dot" style="background:<?= htmlspecialchars($categories[$cat] ?? '#888', ENT_QUOTES) ?>"></span>
-          <?= htmlspecialchars($cat, ENT_QUOTES) ?>
-        </span>
-      <?php endforeach; ?>
-      <?php foreach ($video['tags'] ?? [] as $tagIndex => $tag): ?>
-        <span class="tag">
-          <span class="dot" style="background:<?= htmlspecialchars($tag['color'] ?? '#5599ff', ENT_QUOTES) ?>"></span>
-          <?= htmlspecialchars($tag['label'], ENT_QUOTES) ?>
-          <span class="ts"><?= formatTimestamp((int) $tag['timestamp_seconds']) ?></span>
-        </span>
+      <?php foreach ($assignments as $assignment): ?>
+        <button type="button" class="tag tag-jump" data-seconds="<?= (int) $assignment['timestamp_seconds'] ?>">
+          <span class="dot" style="background:<?= htmlspecialchars($categories[$assignment['name']] ?? '#888', ENT_QUOTES) ?>"></span>
+          <?= htmlspecialchars($assignment['name'], ENT_QUOTES) ?>
+          <span class="ts"><?= VideoCategories::formatTimestamp((int) $assignment['timestamp_seconds']) ?></span>
+        </button>
       <?php endforeach; ?>
     </div>
 
@@ -144,48 +136,51 @@ function formatTimestamp(int $seconds): string
               <?php endforeach; ?>
             </select>
           </div>
-          <div class="field">
-            <label>Categories</label>
-            <?php foreach (array_keys($categories) as $cat): ?>
-              <label style="display:inline-flex; align-items:center; gap:4px; margin-right:12px; font-size:13px; font-weight:normal;">
-                <input type="checkbox" name="categories[]" value="<?= htmlspecialchars($cat, ENT_QUOTES) ?>" <?= in_array($cat, $video['categories'], true) ? 'checked' : '' ?>>
-                <?= htmlspecialchars($cat, ENT_QUOTES) ?>
-              </label>
-            <?php endforeach; ?>
-          </div>
           <button type="submit" class="btn" style="width:auto; padding:8px 20px;">Save Changes</button>
           <a class="btn secondary" style="width:auto; padding:8px 20px; display:inline-block;" href="video.php?id=<?= urlencode($id) ?>">Cancel</a>
         </form>
       </div>
 
-      <div class="section-title">Timestamp Tags</div>
+      <div class="section-title">Categories</div>
       <div class="card" style="max-width:560px;">
-        <?php foreach ($video['tags'] ?? [] as $tag): ?>
+        <?php if ($assignments === []): ?>
+          <p class="hint" style="margin:0 0 12px;">No categories assigned yet.</p>
+        <?php endif; ?>
+
+        <?php foreach ($assignments as $assignment): ?>
           <div class="tag" style="margin-bottom:8px;">
-            <span class="dot" style="background:<?= htmlspecialchars($tag['color'] ?? '#5599ff', ENT_QUOTES) ?>"></span>
-            <?= htmlspecialchars($tag['label'], ENT_QUOTES) ?>
-            <span class="ts"><?= formatTimestamp((int) $tag['timestamp_seconds']) ?></span>
-            <form action="video_tag_delete.php" method="post" style="display:inline;">
+            <span class="dot" style="background:<?= htmlspecialchars($categories[$assignment['name']] ?? '#888', ENT_QUOTES) ?>"></span>
+            <?= htmlspecialchars($assignment['name'], ENT_QUOTES) ?>
+            <span class="ts"><?= VideoCategories::formatTimestamp((int) $assignment['timestamp_seconds']) ?></span>
+            <form action="video_category_delete.php" method="post" style="display:inline;">
               <input type="hidden" name="id" value="<?= htmlspecialchars($id, ENT_QUOTES) ?>">
-              <input type="hidden" name="label" value="<?= htmlspecialchars($tag['label'], ENT_QUOTES) ?>">
-              <input type="hidden" name="timestamp_seconds" value="<?= (int) $tag['timestamp_seconds'] ?>">
+              <input type="hidden" name="name" value="<?= htmlspecialchars($assignment['name'], ENT_QUOTES) ?>">
+              <input type="hidden" name="timestamp_seconds" value="<?= (int) $assignment['timestamp_seconds'] ?>">
               <button type="submit" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:0 0 0 4px;">✕</button>
             </form>
           </div>
         <?php endforeach; ?>
 
-        <form action="video_tag_add.php" method="post" style="display:flex; gap:12px; align-items:flex-end; margin-top:12px;">
+        <form action="video_category_add.php" method="post" style="display:flex; gap:12px; align-items:flex-end; margin-top:12px;">
           <input type="hidden" name="id" value="<?= htmlspecialchars($id, ENT_QUOTES) ?>">
           <div class="field" style="margin-bottom:0; flex:1;">
-            <label for="tag-label">Label</label>
-            <input type="text" id="tag-label" name="label" required>
+            <label for="cat-name">Category</label>
+            <select id="cat-name" name="name" required>
+              <?php foreach (array_keys($categories) as $name): ?>
+                <option value="<?= htmlspecialchars($name, ENT_QUOTES) ?>"><?= htmlspecialchars($name, ENT_QUOTES) ?></option>
+              <?php endforeach; ?>
+            </select>
           </div>
-          <div class="field" style="margin-bottom:0; width:120px;">
-            <label for="tag-ts">Timestamp (s)</label>
-            <input type="number" id="tag-ts" name="timestamp_seconds" min="0" value="0" required>
+          <div class="field" style="margin-bottom:0; width:130px;">
+            <label for="cat-ts">Time (hh:mm:ss)</label>
+            <input type="text" id="cat-ts" name="timestamp" value="00:00:00" pattern="[0-9]{1,2}:[0-9]{2}:[0-9]{2}" required>
           </div>
-          <button type="submit" class="btn" style="width:auto; padding:8px 20px;">Add Tag</button>
+          <button type="submit" class="btn" style="width:auto; padding:8px 20px;">Add</button>
         </form>
+        <p class="hint" style="margin-top:12px;">
+          Categories come from the global list (Manage Creators → Categories). The same
+          category can be added more than once at different times.
+        </p>
       </div>
 
       <form action="video_delete.php" method="post" style="margin-top:20px;" onsubmit="return confirm('Delete this video permanently?');">
@@ -201,7 +196,7 @@ function formatTimestamp(int $seconds): string
       <div class="creator-avatar" style="width:56px; height:56px; margin:0;"></div>
       <div>
         <div class="creator-name"><?= htmlspecialchars($video['creator'], ENT_QUOTES) ?></div>
-        <div class="creator-meta"><?= htmlspecialchars($creators[$video['creator']]['bio'] ?? 'no bio set', ENT_QUOTES) ?></div>
+        <div class="creator-meta"><?= htmlspecialchars($creators[$video['creator']]['bio'] ?? '', ENT_QUOTES) ?: 'no bio set' ?></div>
       </div>
     </div>
   </aside>
@@ -210,12 +205,35 @@ function formatTimestamp(int $seconds): string
 <script>
   // The video file is only fetched/decrypted on click, never eagerly.
   const player = document.getElementById('player');
-  document.getElementById('player-play').addEventListener('click', () => {
-    const video = document.createElement('video');
-    video.src = player.dataset.videoSrc;
-    video.controls = true;
-    video.autoplay = true;
-    player.replaceChildren(video);
+
+  function startPlayback(atSeconds) {
+    let video = player.querySelector('video');
+
+    if (!video) {
+      video = document.createElement('video');
+      video.src = player.dataset.videoSrc;
+      video.controls = true;
+      video.autoplay = true;
+      player.replaceChildren(video);
+    }
+
+    if (atSeconds !== undefined) {
+      const seek = () => { video.currentTime = atSeconds; };
+      // Seeking needs metadata; if it isn't loaded yet, wait for it.
+      video.readyState >= 1 ? seek() : video.addEventListener('loadedmetadata', seek, { once: true });
+    }
+
+    video.play().catch(() => {});
+  }
+
+  document.getElementById('player-play').addEventListener('click', () => startPlayback());
+
+  // Category chips jump the player to their timestamp.
+  document.querySelectorAll('.tag-jump').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      startPlayback(Number(chip.dataset.seconds));
+      player.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
   });
 </script>
 

@@ -1,0 +1,49 @@
+<?php
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/../src/Session.php';
+require_once __DIR__ . '/../src/VideoCategories.php';
+
+use MyStash\Datastore;
+use MyStash\Session;
+use MyStash\VideoCategories;
+
+Session::requireLogin();
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Location: wall.php');
+    exit;
+}
+
+$id = (string) ($_POST['id'] ?? '');
+$name = (string) ($_POST['name'] ?? '');
+$timestamp = VideoCategories::parseTimestamp((string) ($_POST['timestamp'] ?? '00:00:00'));
+
+$index = Session::refreshIndex();
+$redirect = 'video.php?id=' . urlencode($id) . '&edit=1';
+
+// Only global categories can be assigned.
+if ($name === '' || !isset($index['categories'][$name])) {
+    header('Location: ' . $redirect);
+    exit;
+}
+
+$categories = new VideoCategories();
+$assignments = $categories->load(Session::user(), Session::password(), $id);
+
+// The same category may be assigned repeatedly, but not twice at the same time.
+foreach ($assignments as $assignment) {
+    if ($assignment['name'] === $name && (int) $assignment['timestamp_seconds'] === $timestamp) {
+        header('Location: ' . $redirect);
+        exit;
+    }
+}
+
+$assignments[] = ['name' => $name, 'timestamp_seconds' => $timestamp];
+
+$categories->save(Session::user(), Session::password(), $id, $assignments, $index);
+(new Datastore())->saveIndex(Session::user(), Session::password(), $index);
+Session::setIndex($index);
+
+header('Location: ' . $redirect);

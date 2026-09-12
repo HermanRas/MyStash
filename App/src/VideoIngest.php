@@ -66,7 +66,10 @@ final class VideoIngest
                 default => null,
             };
 
-            $categories = $notConverted ? ['Not Converted'] : [];
+            // Category assignments reference a global category by name and
+            // carry the timestamp they point at (see VideoCategories).
+            $assignments = $notConverted ? [['name' => 'Not Converted', 'timestamp_seconds' => 0]] : [];
+            $categories = Datastore::categoryNames($assignments);
 
             $metadata = [
                 'id' => $id,
@@ -79,8 +82,7 @@ final class VideoIngest
                 'codec' => $codec,
                 'not_converted' => $notConverted,
                 'uploaded_at' => date('c'),
-                'categories' => $categories,
-                'tags' => [],
+                'categories' => $assignments,
                 'preview_capture_seconds' => $previewAt,
             ];
             $metadataPath = "{$workDir}/{$id}.json";
@@ -107,7 +109,6 @@ final class VideoIngest
                 'categories' => $categories,
                 'quality' => $quality,
                 'tile_gradient' => $this->randomTileGradient(),
-                'tags' => [],
             ];
         } finally {
             Datastore::wipe($workDir);

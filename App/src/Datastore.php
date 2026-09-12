@@ -4,37 +4,42 @@ declare(strict_types=1);
 
 namespace MyStash;
 
+require_once __DIR__ . '/Crypto7z.php';
+
 /**
- * Reads/writes the per-user encrypted video index ({user}.json.enc).
+ * Reads/writes the per-user encrypted video index ({user}.json.enc) and the
+ * per-video metadata files (Video{ID}/{ID}.json.enc).
  *
  * See Docs/SPECIFICATIONS.md §3 for the on-disk datastore layout and §2.1
  * for the login flow this class implements the decrypt/verify step of.
  *
- * Index schema (decrypted JSON):
+ * Index schema ({user}.json — the global, per-user record):
  * {
- *   "categories": { "<name>": "<hex color>" },
+ *   "categories": { "<name>": "<hex color>" },   // global category definitions
  *   "creators":   { "<name>": {"name","age","gender","bio","verified"} },
  *   "videos": [
  *     {
  *       "id", "title", "description", "creator", "length_seconds", "views",
- *       "format", "codec", "not_converted", "categories": ["..."],
+ *       "format", "codec", "not_converted",
  *       "quality", "tile_gradient": ["#a","#b"],
- *       "tags": [{"label","color","timestamp_seconds"}]
+ *       "categories": ["<name>", ...]   // DENORMALIZED, de-duplicated names only
  *     }
  *   ]
  * }
  *
- * Per-video metadata schema (Video{ID}/{ID}.json.enc — created during ingestion
- * in Phase 3, not yet written by this class): the fuller record for a single
- * video, of which the index above keeps only a denormalized summary for the
- * wall grid.
+ * Per-video metadata schema (Video{ID}/{ID}.json — the source of truth for a
+ * single video's category assignments):
  * {
- *   "id", "title", "description", "creator", "length_seconds",
- *   "views", "format", "codec", "not_converted",
- *   "uploaded_at", "categories": ["..."],
- *   "tags": [{"label","color","timestamp_seconds"}],
+ *   "id", "title", "description", "creator", "length_seconds", "views",
+ *   "format", "codec", "not_converted", "uploaded_at",
+ *   "categories": [ {"name": "<global category name>", "timestamp_seconds": 0} ],
  *   "preview_capture_seconds"
  * }
+ *
+ * A video may carry the same category more than once at different timestamps —
+ * each entry is an independent assignment. The index keeps only the unique
+ * names so the wall grid and its filters can render without decrypting every
+ * video's metadata archive on each page load.
  */
 final class Datastore
 {
@@ -103,34 +108,7 @@ final class Datastore
             return null;
         }
 
-        $archive = $this->indexArchivePath($user);
-        if (!file_exists($archive)) {
-            return null;
-        }
-
-        if (!is_dir(self::TMPFS_ROOT)) {
-            mkdir(self::TMPFS_ROOT, 0700, true);
-        }
-
-        $extractDir = self::TMPFS_ROOT . '/' . bin2hex(random_bytes(8));
-
-        try {
-            if (!$this->crypto->extract($archive, $extractDir, $password)) {
-                return null;
-            }
-
-            $jsonPath = $extractDir . '/' . basename($archive, '.enc');
-            if (!file_exists($jsonPath)) {
-                return null;
-            }
-
-            $json = file_get_contents($jsonPath);
-            $data = json_decode($json, true);
-
-            return is_array($data) ? $data : null;
-        } finally {
-            self::wipe($extractDir);
-        }
+        return $this->loadJsonArchive($this->indexArchivePath($user), "{$user}.json", $password);
     }
 
     /**
@@ -138,25 +116,81 @@ final class Datastore
      */
     public function saveIndex(string $user, string $password, array $index): bool
     {
-        if (!is_dir(self::TMPFS_ROOT)) {
-            mkdir(self::TMPFS_ROOT, 0700, true);
+        $videosDir = self::DATA_ROOT . "/{$user}/videos";
+        if (!is_dir($videosDir)) {
+            mkdir($videosDir, 0700, true);
         }
 
-        $workDir = self::TMPFS_ROOT . '/' . bin2hex(random_bytes(8));
-        mkdir($workDir, 0700, true);
+        return $this->saveJsonArchive($this->indexArchivePath($user), "{$user}.json", $password, $index);
+    }
 
-        $plainName = "{$user}.json";
+    public function loadVideoMetadata(string $user, string $password, string $id): ?array
+    {
+        return $this->loadJsonArchive(self::videoDir($user, $id) . "/{$id}.json.enc", "{$id}.json", $password);
+    }
+
+    public function saveVideoMetadata(string $user, string $password, string $id, array $metadata): bool
+    {
+        $dir = self::videoDir($user, $id);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0700, true);
+        }
+
+        return $this->saveJsonArchive("{$dir}/{$id}.json.enc", "{$id}.json", $password, $metadata);
+    }
+
+    /**
+     * The unique category names of a video's assignments, in first-seen order —
+     * what the index carries for wall rendering and filtering.
+     */
+    public static function categoryNames(array $assignments): array
+    {
+        $names = [];
+        foreach ($assignments as $assignment) {
+            $name = $assignment['name'] ?? null;
+            if ($name !== null && !in_array($name, $names, true)) {
+                $names[] = $name;
+            }
+        }
+
+        return $names;
+    }
+
+    private function loadJsonArchive(string $archivePath, string $plainName, string $password): ?array
+    {
+        if (!file_exists($archivePath)) {
+            return null;
+        }
+
+        $extractDir = self::tmpfsWorkDir('extract');
+
+        try {
+            if (!$this->crypto->extract($archivePath, $extractDir, $password)) {
+                return null;
+            }
+
+            $jsonPath = "{$extractDir}/{$plainName}";
+            if (!file_exists($jsonPath)) {
+                return null;
+            }
+
+            $data = json_decode((string) file_get_contents($jsonPath), true);
+
+            return is_array($data) ? $data : null;
+        } finally {
+            self::wipe($extractDir);
+        }
+    }
+
+    private function saveJsonArchive(string $archivePath, string $plainName, string $password, array $data): bool
+    {
+        $workDir = self::tmpfsWorkDir('extract');
         $plainPath = "{$workDir}/{$plainName}";
 
         try {
-            file_put_contents($plainPath, json_encode($index, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            file_put_contents($plainPath, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
 
-            $videosDir = self::DATA_ROOT . "/{$user}/videos";
-            if (!is_dir($videosDir)) {
-                mkdir($videosDir, 0700, true);
-            }
-
-            return $this->crypto->encrypt($plainPath, $this->indexArchivePath($user), $password);
+            return $this->crypto->encrypt($plainPath, $archivePath, $password);
         } finally {
             self::wipe($workDir);
         }

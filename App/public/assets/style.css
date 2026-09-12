@@ -120,9 +120,14 @@ a {
   display: none;
   position: absolute;
   right: 0;
-  top: calc(100% + 8px);
+  /* The 8px offset below the trigger is a transparent top border rather than
+     a `top` offset, so the gap still belongs to the menu and moving the
+     pointer across it doesn't drop :hover and close the dropdown. */
+  top: 100%;
   background: var(--surface);
+  background-clip: padding-box;
   border: 1px solid var(--border);
+  border-top: 8px solid transparent;
   border-radius: 8px;
   min-width: 180px;
   overflow: hidden;
@@ -571,6 +576,17 @@ a {
   font-size: 12px;
   margin: 0 8px 8px 0;
   cursor: pointer;
+}
+
+/* Category chips that seek the player to their timestamp. */
+.tag-jump {
+  color: var(--text);
+  font-family: inherit;
+}
+
+.tag-jump:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .tag .dot {
