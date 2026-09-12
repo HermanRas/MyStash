@@ -62,6 +62,17 @@ $previewImage = $workDir . '/1_preview.jpg';
 step('ffmpeg extracts a preview frame at 15s', $encoder->extractFrame($fixture, $previewImage, 15.0));
 
 $previewClip = $workDir . '/1_preview.mp4';
-step('ffmpeg builds a short preview clip', $encoder->buildPreviewClip($fixture, $previewClip));
+step('ffmpeg builds the timelapse preview clip', $encoder->buildPreviewClip($fixture, $previewClip));
+
+$fixtureDuration = $encoder->durationSeconds($fixture) ?? 0.0;
+$clipDuration = $encoder->durationSeconds($previewClip) ?? 0.0;
+step(
+    sprintf(
+        'preview clip skims the whole video (source %.1fs -> preview %.1fs)',
+        $fixtureDuration,
+        $clipDuration,
+    ),
+    $clipDuration > 0 && $clipDuration < $fixtureDuration,
+);
 
 echo PHP_EOL . "All smoke tests passed." . PHP_EOL;

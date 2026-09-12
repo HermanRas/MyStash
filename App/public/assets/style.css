@@ -222,16 +222,17 @@ a {
   align-items: flex-start;
 }
 
+/* Open by default; the Filters button collapses it. */
 .filter-panel {
   flex: 0 0 260px;
   width: 260px;
   padding: 20px;
   border-right: 1px solid var(--border);
-  display: none;
+  display: block;
 }
 
-.filter-panel.open {
-  display: block;
+.filter-panel.closed {
+  display: none;
 }
 
 .filter-section {

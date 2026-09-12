@@ -55,8 +55,10 @@ final class VideoIngest
             $previewImagePath = "{$workDir}/preview.jpg";
             $this->encoder->extractFrame($originalPath, $previewImagePath, $previewAt);
 
+            // The clip is a timelapse over the whole video, so unlike the
+            // preview image it doesn't start from the chosen timestamp.
             $previewClipPath = "{$workDir}/preview.mp4";
-            $this->encoder->buildPreviewClip($originalPath, $previewClipPath, $previewAt);
+            $this->encoder->buildPreviewClip($originalPath, $previewClipPath);
 
             $height = $this->encoder->videoHeight($originalPath);
             $quality = match (true) {

@@ -46,7 +46,7 @@ Verified by serving `App/public/` via `docker compose up` and screenshotting all
 
 ### Phase 3 follow-ups (from idea review)
 
-- [ ] 3.8 Rebuild the preview clip as a **timelapse**, per SPECIFICATIONS.md §2.3: sample one frame every 15s across the whole video and join them into a short silent clip. The current implementation (`VideoEncoder::buildPreviewClip`) takes a continuous ~4s excerpt from the preview timestamp instead, so the hover preview shows one moment rather than skimming the video.
+- [x] 3.8 Rebuild the preview clip as a **timelapse**, per SPECIFICATIONS.md §2.3: sample one frame every 15s across the whole video and join them into a short silent clip — `VideoEncoder::buildPreviewClip()`. Done in two ffmpeg passes (sample stills, then join at 4fps); a single pass using `setpts`/`-r` silently dropped most sampled frames. Verified: a 62s source now yields a 4-frame, 1s, 480px-wide clip spanning the whole video instead of a continuous excerpt.
 - [ ] 3.9 Let the user set the preview image by **uploading their own** as well as picking a timestamp, and allow changing it after upload from the video edit screen. Only "pick a timestamp at upload time" exists today.
 
 ## Phase 4 — Video & Creator Management
@@ -69,6 +69,9 @@ All verified end-to-end via curl (edit/rename/delete/convert/tag add-delete/cate
 - [ ] 4.10 Creator avatar image: upload/replace a picture per creator, encrypted in the datastore and served through `media.php`. The UI spec (§4.2, §4.3) calls for circular avatars and the idea lists "Creator upload", but creators currently have no image field — every tile renders an empty gradient circle.
 - [ ] 4.11 Creator view count — the idea asks for "video **and** Creator view count". Creator tiles show a video count today; the view count (sum of their videos' views) is not tracked or shown.
 - [ ] 4.12 Show **length** in the tile's text line under the thumbnail (idea: "title, length, Creator and categories"). Length currently appears only as the duration badge overlaying the thumbnail.
+- [x] 4.13 Global categories moved to their own screen (`App/public/category.php`), reached from the user dropdown instead of being buried at the bottom of the Creators page. Shows how many videos use each category, allows recolouring, and removal now only retires the definition — videos keep tags they already have (SPECIFICATIONS.md §2.7).
+- [x] 4.14 Fixed: the wall's and profile page's "Manage Creators" menu item still pointed at `creator.html`, which stopped existing when it was renamed to `creator.php` — so that menu item was dead.
+- [x] 4.15 The wall's filter panel is now open by default; the Filters button collapses it.
 
 ## Phase 5 — Search, Filter, Sort, Playlists
 
@@ -91,8 +94,8 @@ All verified end-to-end via curl (edit/rename/delete/convert/tag add-delete/cate
 
 ## Phase 7 — Multi-user Support & Hardening
 
-- [ ] 7.0 **User creation flow** — nothing can create a new user today. Login only checks that `App/Data/{user}/` already exists, so the "multiple users, each with their own datastore" goal is unreachable except by running the dev seed script. Needs a way to create `{user}/videos/` plus an initial `{user}.json.enc` encrypted with the chosen password. Decide first whether registration is open, or a CLI/admin-only action (this is a personal, self-hosted app — open sign-up may not be wanted).
-- [ ] 7.1 Confirm full isolation between `App/Data/{user}/` datastores — including that `{user}` from the login form can't escape its directory (path traversal) or probe other users' existence
+- [x] 7.0 **User creation flow** — `App/public/register.php` + `App/src/User.php`, linked from the login page. Creates `{user}/videos/{user}.json.enc` with an empty video list, a `default` creator and a `Not Converted` category (both required by ingestion), then signs the user straight in. Usernames are letters/digits only, max 32 chars, and must be unused; the same validation now guards `login.php`, which also closes the path-traversal hole in 7.1. Verified: symbols, traversal attempts, duplicates, empty and mismatched passwords all rejected; a new stash logs in isolated and empty.
+- [ ] 7.1 Confirm full isolation between `App/Data/{user}/` datastores — path traversal via `{user}` is handled (see 7.0); still to check: that one user can't probe another's existence, and that no cross-user paths leak anywhere else
 - [ ] 7.2 Review PHP `exec`/`proc_open` calls for command-injection safety (arguments arrays, not string interpolation)
 - [ ] 7.3 Rate-limit / lockout considerations on login attempts
 - [ ] 7.4 Final review against SPECIFICATIONS.md app flow (§2) for completeness

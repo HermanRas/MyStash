@@ -47,14 +47,15 @@ function creatorLabel(array $creators, string $name): string
 
   <div class="header-actions">
     <button class="icon-btn" id="upload-toggle" aria-expanded="false" aria-controls="upload-panel">+ Upload</button>
-    <button class="icon-btn" id="filters-toggle" aria-expanded="false" aria-controls="filter-panel">Filters</button>
+    <button class="icon-btn" id="filters-toggle" aria-expanded="true" aria-controls="filter-panel">Filters</button>
     <div class="user-menu" tabindex="0">
       <div class="user-menu-trigger">
         <div class="avatar"></div>
         <?= htmlspecialchars(Session::user(), ENT_QUOTES) ?>
       </div>
       <div class="user-menu-dropdown">
-        <a href="creator.html">Manage Creators</a>
+        <a href="creator.php">Manage Creators</a>
+        <a href="category.php">Manage Categories</a>
         <a href="user.html">Profile &amp; Password</a>
         <a href="logout.php">Log Out</a>
       </div>
@@ -66,7 +67,7 @@ function creatorLabel(array $creators, string $name): string
   <span class="pill active">All</span>
   <span class="pill">Most Recent</span>
   <span class="pill">Not Converted</span>
-  <a class="pill" href="creator.html">Creators</a>
+  <a class="pill" href="creator.php">Creators</a>
   <?php foreach ($categories as $name => $color): ?>
     <?php if (in_array($name, ['Most Recent', 'Not Converted'], true)) continue; ?>
     <span class="pill"><?= htmlspecialchars($name, ENT_QUOTES) ?></span>
@@ -170,8 +171,8 @@ function creatorLabel(array $creators, string $name): string
   const toggle = document.getElementById('filters-toggle');
   const panel = document.getElementById('filter-panel');
   toggle.addEventListener('click', () => {
-    const isOpen = panel.classList.toggle('open');
-    toggle.setAttribute('aria-expanded', String(isOpen));
+    const isClosed = panel.classList.toggle('closed');
+    toggle.setAttribute('aria-expanded', String(!isClosed));
   });
 
   const uploadToggle = document.getElementById('upload-toggle');

@@ -120,27 +120,59 @@ final class VideoEncoder
     }
 
     /**
-     * Builds a short, silent, low-bitrate preview clip starting at $startSeconds.
+     * Builds the silent preview clip: a timelapse that samples one frame every
+     * $intervalSeconds across the whole video and plays them back at
+     * $playbackFps, so hovering skims the entire video rather than showing one
+     * continuous moment (Docs/SPECIFICATIONS.md §2.3).
      */
     public function buildPreviewClip(
         string $inputPath,
         string $outputPath,
-        float $startSeconds = 15.0,
-        float $durationSeconds = 4.0,
+        float $intervalSeconds = 15.0,
+        int $playbackFps = 4,
     ): bool {
-        $command = [
-            $this->ffmpeg,
-            '-y',
-            '-ss', (string) $startSeconds,
-            '-i', $inputPath,
-            '-t', (string) $durationSeconds,
-            '-an',
-            '-c:v', 'libx264',
-            '-crf', '30',
-            $outputPath,
-        ];
+        // Done in two passes — sample the stills, then join them at the
+        // playback rate. Re-timing in a single pass (setpts/-r) makes ffmpeg
+        // drop most of the sampled frames.
+        $framesDir = dirname($outputPath) . '/preview_frames_' . bin2hex(random_bytes(4));
+        if (!mkdir($framesDir, 0700, true)) {
+            return false;
+        }
 
-        return $this->run($command)[0] === 0;
+        try {
+            $sampled = $this->run([
+                $this->ffmpeg,
+                '-y',
+                '-i', $inputPath,
+                '-vf', sprintf('fps=1/%s,scale=480:-2', $this->formatInterval($intervalSeconds)),
+                '-an',
+                "{$framesDir}/frame_%04d.jpg",
+            ]);
+
+            if ($sampled[0] !== 0 || glob("{$framesDir}/frame_*.jpg") === []) {
+                return false;
+            }
+
+            return $this->run([
+                $this->ffmpeg,
+                '-y',
+                '-framerate', (string) $playbackFps,
+                '-i', "{$framesDir}/frame_%04d.jpg",
+                '-an',
+                '-c:v', 'libx264',
+                '-crf', '30',
+                '-pix_fmt', 'yuv420p',
+                $outputPath,
+            ])[0] === 0;
+        } finally {
+            array_map('unlink', glob("{$framesDir}/*") ?: []);
+            rmdir($framesDir);
+        }
+    }
+
+    private function formatInterval(float $seconds): string
+    {
+        return rtrim(rtrim(number_format($seconds, 3, '.', ''), '0'), '.');
     }
 
     /**

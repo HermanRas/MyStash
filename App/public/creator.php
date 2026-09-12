@@ -48,6 +48,7 @@ function videoCount(array $videos, string $creatorName): int
       </div>
       <div class="user-menu-dropdown">
         <a href="creator.php">Manage Creators</a>
+        <a href="category.php">Manage Categories</a>
         <a href="user.html">Profile &amp; Password</a>
         <a href="logout.php">Log Out</a>
       </div>
@@ -114,31 +115,6 @@ function videoCount(array $videos, string $creatorName): int
     </div>
   <?php endif; ?>
 
-  <div class="section-title">Categories</div>
-  <div class="card" style="max-width:480px;">
-    <?php foreach ($categories as $name => $color): ?>
-      <div class="tag" style="margin-right:8px;">
-        <span class="dot" style="background:<?= htmlspecialchars($color, ENT_QUOTES) ?>"></span>
-        <?= htmlspecialchars($name, ENT_QUOTES) ?>
-        <form action="category_delete.php" method="post" style="display:inline;" onsubmit="return confirm('Delete category &quot;<?= htmlspecialchars($name, ENT_QUOTES) ?>&quot;? It will be removed from all videos.');">
-          <input type="hidden" name="name" value="<?= htmlspecialchars($name, ENT_QUOTES) ?>">
-          <button type="submit" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:0 0 0 4px;">✕</button>
-        </form>
-      </div>
-    <?php endforeach; ?>
-
-    <form action="category_save.php" method="post" style="margin-top:16px; display:flex; gap:12px; align-items:flex-end;">
-      <div class="field" style="margin-bottom:0; flex:1;">
-        <label for="cat-name">New category</label>
-        <input type="text" id="cat-name" name="name" required>
-      </div>
-      <div class="field" style="margin-bottom:0;">
-        <label for="cat-color">Color</label>
-        <input type="color" id="cat-color" name="color" value="#ffa31a" style="height:38px; width:60px; padding:2px; background:var(--surface-alt); border:1px solid var(--border); border-radius:6px;">
-      </div>
-      <button type="submit" class="btn" style="width:auto; padding:8px 20px;">Add</button>
-    </form>
-  </div>
 </main>
 
 </body>

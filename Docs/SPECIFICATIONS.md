@@ -19,7 +19,11 @@
 
 ## 2. App Flow
 
-### 2.1 Login
+### 2.1 Registration & Login
+
+**Creating a stash:** a user is nothing more than a datastore directory plus an index archive encrypted with their password — there is no account record and no stored password. Registration (`register.php`) takes a username, a password and a confirmation, then creates `App/Data/{user}/videos/{user}.json.enc` holding an empty video list, a `default` creator and a `Not Converted` category (both of which ingestion relies on). Usernames are **letters and digits only**, at most 32 characters, and must be unused. That rule is also what makes a username safe to use directly as a path segment — no separators or dots, so it cannot escape the data directory. The same validation guards login.
+
+Because the password *is* the encryption key and is never stored, a forgotten password means the stash cannot be recovered — by the user or anyone else.
 
 1. User submits a **username** and **password**. Neither is stored anywhere by the app.
 2. App checks that path `./{user}` exists (confirms a valid username).
@@ -74,8 +78,9 @@ Categories work like creators: they are **global definitions** (name + colour) m
 - Each assignment carries a timestamp (`hh:mm:ss`, default `00:00:00`) so a category can point at a specific moment; clicking it on the watch page seeks the player there.
 - The **same category may be assigned multiple times** at different timestamps. Only the exact same category at the exact same timestamp is rejected as a duplicate.
 - On the video edit screen you pick a category from the global list — categories can't be invented ad hoc per video.
-- Deleting a global category removes every assignment of it across all videos.
+- Removing a global category only **retires the definition**: it can no longer be assigned to videos and it disappears from the wall's filter panel, but videos already tagged with it **keep their tags** (they render in a neutral grey, since there's no colour to look up).
 - The wall's filter list is populated from the global definitions.
+- Categories are managed on their own screen (`category.php`), reached from the user dropdown in the nav bar — the same place as "Manage Creators".
 
 The index also keeps a **de-duplicated copy of each video's category names** on its entry. That copy is derived, not authoritative: it exists so the wall grid and its filters can render without decrypting every video's metadata archive on each page load.
 

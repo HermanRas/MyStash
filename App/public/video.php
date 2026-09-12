@@ -64,6 +64,7 @@ function formatLength(int $seconds): string
       </div>
       <div class="user-menu-dropdown">
         <a href="creator.php">Manage Creators</a>
+        <a href="category.php">Manage Categories</a>
         <a href="user.html">Profile &amp; Password</a>
         <a href="logout.php">Log Out</a>
       </div>

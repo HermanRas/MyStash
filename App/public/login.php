@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/../src/Crypto7z.php';
-require __DIR__ . '/../src/Datastore.php';
-require __DIR__ . '/../src/Session.php';
+require_once __DIR__ . '/../src/Session.php';
+require_once __DIR__ . '/../src/User.php';
 
 use MyStash\Datastore;
 use MyStash\Session;
+use MyStash\User;
 
 Session::start();
 
@@ -19,7 +19,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $user = trim((string) ($_POST['username'] ?? ''));
 $password = (string) ($_POST['password'] ?? '');
 
-$index = $user !== '' && $password !== ''
+// The name is used as a path segment, so reject anything but letters/digits
+// before it reaches the filesystem.
+$index = User::isValidName($user) && $password !== ''
     ? (new Datastore())->loadIndex($user, $password)
     : null;
 

@@ -61,33 +61,6 @@ final class VideoCategories
     }
 
     /**
-     * Removes a category everywhere it is assigned, across every video.
-     * Used when a global category is deleted.
-     */
-    public function removeCategoryEverywhere(string $user, string $password, string $name, array &$index): void
-    {
-        foreach ($index['videos'] as &$video) {
-            if (!in_array($name, $video['categories'] ?? [], true)) {
-                continue;
-            }
-
-            $assignments = array_values(array_filter(
-                $this->load($user, $password, $video['id']),
-                static fn($a) => $a['name'] !== $name,
-            ));
-
-            $metadata = $this->datastore->loadVideoMetadata($user, $password, $video['id']);
-            if ($metadata !== null) {
-                $metadata['categories'] = $assignments;
-                $this->datastore->saveVideoMetadata($user, $password, $video['id'], $metadata);
-            }
-
-            $video['categories'] = Datastore::categoryNames($assignments);
-        }
-        unset($video);
-    }
-
-    /**
      * Seeds per-video metadata from the index entry, for videos whose metadata
      * archive doesn't exist yet (e.g. entries created before metadata files
      * were written, or demo data).
