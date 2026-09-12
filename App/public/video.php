@@ -75,7 +75,10 @@ function formatTimestamp(int $seconds): string
 
 <main class="watch-layout">
   <div>
-    <div class="player">▶ Video player placeholder — file loads only on play</div>
+    <div class="player" id="player" data-video-src="media.php?id=<?= urlencode($id) ?>&amp;type=video">
+      <img src="media.php?id=<?= urlencode($id) ?>&amp;type=thumb" alt="" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover;" onerror="this.style.display='none'">
+      <button type="button" id="player-play" style="position:relative; z-index:1; background:rgba(0,0,0,0.6); border:1px solid var(--border); color:#fff; border-radius:50%; width:64px; height:64px; font-size:20px; cursor:pointer;">▶</button>
+    </div>
 
     <?php if (isset($_GET['convert_error'])): ?>
       <p class="hint" style="color:#ff6b6b;">Conversion failed — no encrypted video file exists for this entry yet (seed/demo data has no real media behind it).</p>
@@ -203,6 +206,18 @@ function formatTimestamp(int $seconds): string
     </div>
   </aside>
 </main>
+
+<script>
+  // The video file is only fetched/decrypted on click, never eagerly.
+  const player = document.getElementById('player');
+  document.getElementById('player-play').addEventListener('click', () => {
+    const video = document.createElement('video');
+    video.src = player.dataset.videoSrc;
+    video.controls = true;
+    video.autoplay = true;
+    player.replaceChildren(video);
+  });
+</script>
 
 </body>
 </html>

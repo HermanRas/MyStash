@@ -133,6 +133,8 @@ function creatorLabel(array $creators, string $name): string
            style="--tile-a:<?= htmlspecialchars($video['tile_gradient'][0] ?? '#333', ENT_QUOTES) ?>; --tile-b:<?= htmlspecialchars($video['tile_gradient'][1] ?? '#161616', ENT_QUOTES) ?>;">
           <div class="thumb">
             <div class="thumb-gradient"></div>
+            <img class="thumb-image" src="media.php?id=<?= urlencode($video['id']) ?>&type=thumb" alt="" loading="lazy" onerror="this.style.display='none'">
+            <video class="thumb-preview" muted loop playsinline preload="none" src="media.php?id=<?= urlencode($video['id']) ?>&type=preview"></video>
             <?php if (!empty($video['quality'])): ?>
               <span class="badge quality"><?= htmlspecialchars($video['quality'], ENT_QUOTES) ?></span>
             <?php endif; ?>
@@ -173,6 +175,29 @@ function creatorLabel(array $creators, string $name): string
     output.textContent = format(input.value);
     input.addEventListener('input', () => {
       output.textContent = format(input.value);
+    });
+  });
+
+  // Hover-to-preview (Docs/SPECIFICATIONS.md §4.4): debounce before playing
+  // the preview clip, cancel and reset instantly on mouseleave.
+  document.querySelectorAll('.video-card').forEach((card) => {
+    const video = card.querySelector('.thumb-preview');
+    if (!video) return;
+
+    let timer = null;
+
+    card.addEventListener('mouseenter', () => {
+      timer = setTimeout(() => {
+        video.currentTime = 0;
+        video.style.display = 'block';
+        video.play().catch(() => {});
+      }, 180);
+    });
+
+    card.addEventListener('mouseleave', () => {
+      clearTimeout(timer);
+      video.pause();
+      video.style.display = 'none';
     });
   });
 </script>
