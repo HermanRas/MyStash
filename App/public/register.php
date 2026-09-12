@@ -84,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <input type="password" id="confirm-password" name="confirm_password" autocomplete="new-password"
                minlength="<?= User::MIN_PASSWORD_LENGTH ?>" required>
       </div>
-      <button type="submit" class="btn"><img class="btn-icon" src="assets/img/icons/register.png" alt="">Create Stash</button>
+      <button type="submit" class="btn block"><img class="btn-icon" src="assets/img/icons/register.png" alt="">Create Stash</button>
     </form>
 
     <p class="hint">

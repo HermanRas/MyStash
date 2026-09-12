@@ -688,21 +688,62 @@ select option {
   outline: 2px solid var(--accent);
 }
 
+/* ---------- Buttons ----------
+   One size for every button on the site.
+
+   This used to default to `width: 100%`, which is the rare case, not the
+   common one — so every ordinary button carried an inline
+   `width:auto; padding:…` override, and each override picked its own padding.
+   That is how the video page ended up with four buttons at four sizes.
+
+   The base rule is now the ordinary case: auto width, one height, one padding.
+   The exceptions are named classes (`.block`, `.small`) and nothing sets a
+   button's geometry inline. */
 .btn {
-  display: inline-block;
-  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: auto;
+  min-height: 40px;
+  padding: 0 20px;
   background: var(--accent);
   color: #111;
   border: none;
   border-radius: 6px;
-  padding: 10px 16px;
+  /* A <button> does not inherit the page font but an <a class="btn"> does, so
+     without this the same class rendered at two different sizes depending on
+     which element wore it. */
+  font-family: inherit;
   font-size: 14px;
+  line-height: 1;
   font-weight: 700;
+  white-space: nowrap;
+  text-align: center;
+  vertical-align: middle;
   cursor: pointer;
+}
+
+/* The flex gap already spaces an icon from its label. */
+.btn .btn-icon {
+  margin-right: 0;
 }
 
 .btn:hover {
   filter: brightness(1.1);
+}
+
+/* The one action of a form card, filling its width. */
+.btn.block {
+  width: 100%;
+}
+
+/* Row-level actions in a table, where a full-height button would outweigh the
+   row it belongs to. */
+.btn.small {
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
 }
 
 /* A checkbox belongs inline with its label — the default .field rules stretch
@@ -722,17 +763,15 @@ select option {
   accent-color: var(--accent);
 }
 
-/* Buttons that belong to the same decision sit on one row. */
+/* Buttons that belong to the same decision sit on one row. Each keeps its own
+   width; they line up because the base .btn rule gives them one height.
+   `wrap` so a narrow window stacks them instead of overflowing. */
 .form-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  margin-top: 4px;
-}
-
-.form-actions .btn {
-  width: auto;
-  padding: 8px 20px;
+  margin-top: 16px;
 }
 
 .btn.secondary {
@@ -752,15 +791,50 @@ select option {
 /* Single column: the title leads, then the player, then meta, categories and
    the creator — no side rail. */
 .watch-layout {
-  max-width: 980px;
+  max-width: 1100px;
+  /* The max-width alone left the page pinned to the left edge with all the
+     slack on one side. Centring it splits the slack evenly, the way
+     Bootstrap's .container does. */
+  margin-inline: auto;
   padding: 24px;
+}
+
+/* A video can credit several creators. Their cards flow across the width and
+   wrap, rather than each taking a full row and leaving the space beside it
+   empty. */
+.creator-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .creator-strip {
   display: flex;
   align-items: center;
   gap: 12px;
+  /* Wide enough for a name and a line of bio, but free to share a row. */
+  flex: 1 1 320px;
   max-width: 420px;
+  min-width: 0;
+}
+
+/* The avatar keeps its size while the text takes the slack. */
+.creator-strip .creator-avatar {
+  width: 56px;
+  height: 56px;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.creator-strip-text {
+  min-width: 0;
+}
+
+/* A long bio ellipses rather than forcing the card wider. */
+.creator-strip .creator-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .creator-strip:hover {

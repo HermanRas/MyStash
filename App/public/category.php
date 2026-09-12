@@ -68,14 +68,14 @@ $navActive = 'categories';
               <input type="hidden" name="name" value="<?= htmlspecialchars($name, ENT_QUOTES) ?>">
               <input type="color" name="color" value="<?= htmlspecialchars($color, ENT_QUOTES) ?>"
                      style="height:30px; width:44px; padding:2px; background:var(--surface-alt); border:1px solid var(--border); border-radius:6px;">
-              <button type="submit" class="btn secondary" style="width:auto; padding:5px 12px; font-size:12px;">Recolour</button>
+              <button type="submit" class="btn secondary small">Recolour</button>
             </form>
           </td>
           <td style="padding:10px 0 10px 8px; text-align:right;">
             <form action="category_delete.php" method="post"
                   onsubmit="return confirm('Remove &quot;<?= htmlspecialchars($name, ENT_QUOTES) ?>&quot; from the global list?\n\nVideos already tagged with it keep their tags — you just won\'t be able to add it to new videos, and it disappears from the filter panel.');">
               <input type="hidden" name="name" value="<?= htmlspecialchars($name, ENT_QUOTES) ?>">
-              <button type="submit" class="btn secondary" style="width:auto; padding:5px 12px; font-size:12px;">Remove</button>
+              <button type="submit" class="btn secondary small">Remove</button>
             </form>
           </td>
         </tr>
@@ -92,7 +92,7 @@ $navActive = 'categories';
         <input type="color" id="cat-color" name="color" value="#ffa31a"
                style="height:38px; width:60px; padding:2px; background:var(--surface-alt); border:1px solid var(--border); border-radius:6px;">
       </div>
-      <button type="submit" class="btn" style="width:auto; padding:8px 20px;">Add</button>
+      <button type="submit" class="btn">Add</button>
     </form>
   </div>
 </main>

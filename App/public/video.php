@@ -103,30 +103,34 @@ $navActive = 'videos';
     <?php /* Creators sit below the categories rather than in a side rail. A
              video may credit more than one, so this is a list. */ ?>
     <div class="section-title">Creator<?= count($videoCreators) === 1 ? '' : 's' ?></div>
-    <?php foreach ($videoCreators as $creatorName): ?>
-      <?php $avatar = creatorAvatarUrl($creators, $creatorName); ?>
-      <a class="card creator-strip" href="creator.php?edit=<?= urlencode($creatorName) ?>">
-        <div class="creator-avatar" style="width:56px; height:56px; margin:0;">
-          <?php if ($avatar !== null): ?>
-            <img src="<?= htmlspecialchars($avatar, ENT_QUOTES) ?>" alt="">
-          <?php endif; ?>
-        </div>
-        <div>
-          <div class="creator-name"><?= htmlspecialchars($creatorName, ENT_QUOTES) ?></div>
-          <div class="creator-meta"><?= htmlspecialchars($creators[$creatorName]['bio'] ?? '', ENT_QUOTES) ?: 'no bio set' ?></div>
-        </div>
-      </a>
-    <?php endforeach; ?>
+    <div class="creator-list">
+      <?php foreach ($videoCreators as $creatorName): ?>
+        <?php $avatar = creatorAvatarUrl($creators, $creatorName); ?>
+        <a class="card creator-strip" href="creator.php?edit=<?= urlencode($creatorName) ?>">
+          <div class="creator-avatar">
+            <?php if ($avatar !== null): ?>
+              <img src="<?= htmlspecialchars($avatar, ENT_QUOTES) ?>" alt="">
+            <?php endif; ?>
+          </div>
+          <div class="creator-strip-text">
+            <div class="creator-name"><?= htmlspecialchars($creatorName, ENT_QUOTES) ?></div>
+            <div class="creator-meta"><?= htmlspecialchars($creators[$creatorName]['bio'] ?? '', ENT_QUOTES) ?: 'no bio set' ?></div>
+          </div>
+        </a>
+      <?php endforeach; ?>
+    </div>
 
     <?php if (!$editing): ?>
-      <a class="btn secondary" style="width:auto; margin-top:16px; padding:8px 20px; display:inline-block;" href="video.php?id=<?= urlencode($id) ?>&edit=1">Edit Video</a>
+      <div class="form-actions">
+        <a class="btn secondary" href="video.php?id=<?= urlencode($id) ?>&edit=1">Edit Video</a>
 
-      <?php if (!empty($video['not_converted'])): ?>
-        <form action="video_convert.php" method="post" style="display:inline;">
-          <input type="hidden" name="id" value="<?= htmlspecialchars($id, ENT_QUOTES) ?>">
-          <button type="submit" class="btn" style="width:auto; margin-top:16px; padding:8px 20px;">Convert to MP4/H.265</button>
-        </form>
-      <?php endif; ?>
+        <?php if (!empty($video['not_converted'])): ?>
+          <form action="video_convert.php" method="post">
+            <input type="hidden" name="id" value="<?= htmlspecialchars($id, ENT_QUOTES) ?>">
+            <button type="submit" class="btn">Convert to MP4/H.265</button>
+          </form>
+        <?php endif; ?>
+      </div>
 
       <div class="section-title">Description</div>
       <p class="tile-stats" style="font-size:13px; color:#ccc;">
@@ -158,8 +162,10 @@ $navActive = 'videos';
             <?php endforeach; ?>
             <p class="hint" style="margin:6px 0 0;">A video can credit more than one creator. Tick none and it falls back to <code>default</code>.</p>
           </div>
-          <button type="submit" class="btn" style="width:auto; padding:8px 20px;">Save Changes</button>
-          <a class="btn secondary" style="width:auto; padding:8px 20px; display:inline-block;" href="video.php?id=<?= urlencode($id) ?>">Cancel</a>
+          <div class="form-actions">
+            <button type="submit" class="btn">Save Changes</button>
+            <a class="btn secondary" href="video.php?id=<?= urlencode($id) ?>">Cancel</a>
+          </div>
         </form>
       </div>
 
@@ -197,7 +203,7 @@ $navActive = 'videos';
             <label for="cat-ts">Time (hh:mm:ss)</label>
             <input type="text" id="cat-ts" name="timestamp" value="00:00:00" pattern="[0-9]{1,2}:[0-9]{2}:[0-9]{2}" required>
           </div>
-          <button type="submit" class="btn" style="width:auto; padding:8px 20px;">Add</button>
+          <button type="submit" class="btn">Add</button>
         </form>
         <p class="hint" style="margin-top:12px;">
           Categories come from the global list (user menu → Manage Categories). The same
@@ -205,9 +211,9 @@ $navActive = 'videos';
         </p>
       </div>
 
-      <form action="video_delete.php" method="post" style="margin-top:20px;" onsubmit="return confirm('Delete this video permanently?');">
+      <form class="form-actions" action="video_delete.php" method="post" onsubmit="return confirm('Delete this video permanently?');">
         <input type="hidden" name="id" value="<?= htmlspecialchars($id, ENT_QUOTES) ?>">
-        <button type="submit" class="btn secondary" style="width:auto; padding:8px 20px;">Delete Video</button>
+        <button type="submit" class="btn secondary">Delete Video</button>
       </form>
     <?php endif; ?>
   </div>

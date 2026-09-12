@@ -62,7 +62,7 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
       <label for="preview-at">Preview capture time, seconds (optional — defaults to 15s)</label>
       <input type="number" id="preview-at" name="preview_at" min="0" step="1" placeholder="15">
     </div>
-    <button type="submit" class="btn" style="width:auto; padding:8px 24px;">Upload</button>
+    <button type="submit" class="btn">Upload</button>
   </form>
 </div>
 
@@ -139,7 +139,7 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
       <?php /* No Apply button — the form submits on change (see below). No
                Reset either: "All Videos" in the top nav is the bare wall URL,
                which is the same thing. */ ?>
-      <noscript><button type="submit" class="btn" style="width:100%;">Apply Filters</button></noscript>
+      <noscript><button type="submit" class="btn block">Apply Filters</button></noscript>
     </form>
   </aside>
 
@@ -164,7 +164,7 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
             <option value="<?= $value ?>" <?= $value === $query->sort ? 'selected' : '' ?>><?= $label ?></option>
           <?php endforeach; ?>
         </select>
-        <noscript><button type="submit" class="btn secondary" style="width:auto; padding:6px 14px;">Go</button></noscript>
+        <noscript><button type="submit" class="btn secondary small">Go</button></noscript>
       </form>
     </div>
 
