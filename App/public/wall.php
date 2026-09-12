@@ -129,7 +129,7 @@ function creatorLabel(array $creators, string $name): string
     <div class="video-grid">
 
       <?php foreach ($videos as $video): ?>
-        <a class="video-card" href="video.html?id=<?= urlencode($video['id']) ?>"
+        <a class="video-card" href="video.php?id=<?= urlencode($video['id']) ?>"
            style="--tile-a:<?= htmlspecialchars($video['tile_gradient'][0] ?? '#333', ENT_QUOTES) ?>; --tile-b:<?= htmlspecialchars($video['tile_gradient'][1] ?? '#161616', ENT_QUOTES) ?>;">
           <div class="thumb">
             <div class="thumb-gradient"></div>

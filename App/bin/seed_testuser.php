@@ -35,6 +35,7 @@ $index = [
         [
             'id' => '1',
             'title' => 'Evening Session — Full Walkthrough',
+            'description' => '',
             'creator' => 'default',
             'length_seconds' => 860,
             'views' => 128,
@@ -49,6 +50,7 @@ $index = [
         [
             'id' => '2',
             'title' => 'Studio Test Clip 01',
+            'description' => '',
             'creator' => 'Alex R.',
             'length_seconds' => 342,
             'views' => 34,
@@ -63,6 +65,7 @@ $index = [
         [
             'id' => '3',
             'title' => 'Behind the Scenes — Raw Footage',
+            'description' => '',
             'creator' => 'default',
             'length_seconds' => 1325,
             'views' => 9,
@@ -77,6 +80,7 @@ $index = [
         [
             'id' => '4',
             'title' => 'Quick Recap Reel',
+            'description' => '',
             'creator' => 'Jamie K.',
             'length_seconds' => 491,
             'views' => 210,
@@ -91,6 +95,7 @@ $index = [
         [
             'id' => '5',
             'title' => 'Long-Form Interview Draft',
+            'description' => '',
             'creator' => 'default',
             'length_seconds' => 1907,
             'views' => 17,
@@ -105,6 +110,7 @@ $index = [
         [
             'id' => '6',
             'title' => 'Preview Clip Sample',
+            'description' => '',
             'creator' => 'Alex R.',
             'length_seconds' => 178,
             'views' => 5,

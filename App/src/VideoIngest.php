@@ -97,6 +97,7 @@ final class VideoIngest
             return [
                 'id' => $id,
                 'title' => $metadata['title'],
+                'description' => '',
                 'creator' => 'default',
                 'length_seconds' => $metadata['length_seconds'],
                 'views' => 0,

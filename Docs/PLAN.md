@@ -46,11 +46,14 @@ Verified by serving `App/public/` via `docker compose up` and screenshotting all
 
 ## Phase 4 — Video & Creator Management
 
-- [ ] 4.1 Video edit (title, description, category tags, timestamps) from `video.html`
-- [ ] 4.2 Video delete (remove `Video{ID}/` directory, update index)
-- [ ] 4.3 Video conversion feature: convert to MP4/H.265, remove `not converted` tag on success
-- [ ] 4.4 Creator CRUD (create/edit/delete) from the nav dropdown "manage creators" screen
-- [ ] 4.5 Category management: global list of name + color, used by both video tagging and pill bar
+- [ ] 4.0 Media serving endpoint: decrypt-on-the-fly streaming for preview thumbnails/clips (wall hover-preview) and full video playback (video watch page) — not yet built; `wall.php` still shows CSS gradient placeholders instead of the real encrypted preview assets generated in Phase 3. Both need the same kind of endpoint (decrypt to tmpfs or pipe, stream, clean up), so tackle together.
+- [x] 4.1 Video edit (title, description, category tags, timestamps) from `video.html` — renamed to `App/public/video.php` (view + `?edit=1` mode), `video_save.php`, `video_tag_add.php`/`video_tag_delete.php`
+- [x] 4.2 Video delete (remove `Video{ID}/` directory, update index) — `App/public/video_delete.php`
+- [x] 4.3 Video conversion feature: convert to MP4/H.265, remove `not converted` tag on success — `App/public/video_convert.php`; fails gracefully (no-op + banner) for index entries with no real encrypted file behind them (e.g. seeded demo data)
+- [x] 4.4 Creator CRUD (create/edit/delete) from the nav dropdown "manage creators" screen — renamed to `App/public/creator.php`, `creator_save.php`/`creator_delete.php`; renaming a creator repoints their videos, deleting reassigns videos to `default`
+- [x] 4.5 Category management: global list of name + color, used by both video tagging and pill bar — added to `creator.php`, `category_save.php`/`category_delete.php`; deleting a category strips it from every video's category list
+
+All verified end-to-end via curl (edit/rename/delete/convert/tag add-delete/category add-delete) and screenshots of the rendered pages; datastore reset to the clean seed afterward.
 
 ## Phase 5 — Search, Filter, Sort, Playlists
 

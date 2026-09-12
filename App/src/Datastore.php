@@ -16,7 +16,7 @@ namespace MyStash;
  *   "creators":   { "<name>": {"name","age","gender","bio","verified"} },
  *   "videos": [
  *     {
- *       "id", "title", "creator", "length_seconds", "views",
+ *       "id", "title", "description", "creator", "length_seconds", "views",
  *       "format", "codec", "not_converted", "categories": ["..."],
  *       "quality", "tile_gradient": ["#a","#b"],
  *       "tags": [{"label","color","timestamp_seconds"}]
