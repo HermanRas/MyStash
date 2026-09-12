@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/../src/Session.php';
-require __DIR__ . '/../src/VideoQuery.php';
+require_once __DIR__ . '/../src/Session.php';
+require_once __DIR__ . '/../src/VideoQuery.php';
+require_once __DIR__ . '/../src/VideoCreators.php';
 
 use MyStash\Session;
+use MyStash\VideoCreators;
 use MyStash\VideoQuery;
 
 Session::requireLogin();
@@ -161,7 +163,7 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
             <div class="preview-progress"></div>
           </div>
           <div class="tile-title"><?= htmlspecialchars($video['title'], ENT_QUOTES) ?></div>
-          <div class="tile-creator"><?= htmlspecialchars($video['creator'], ENT_QUOTES) ?></div>
+          <div class="tile-creator"><?= htmlspecialchars(VideoCreators::label($video), ENT_QUOTES) ?></div>
           <div class="tile-stats">
             <?= formatLength((int) $video['length_seconds']) ?> • <?= (int) $video['views'] ?> views<?php
               if (!empty($video['categories'])): ?> • <?= htmlspecialchars(implode(', ', $video['categories']), ENT_QUOTES) ?><?php endif; ?>

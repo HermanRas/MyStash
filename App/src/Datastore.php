@@ -20,7 +20,8 @@ require_once __DIR__ . '/Crypto7z.php';
  *                                                // DENORMALIZED — see CreatorStore
  *   "videos": [
  *     {
- *       "id", "title", "description", "creator", "length_seconds", "views",
+ *       "id", "title", "description", "creators": ["<name>", ...],
+ *       "length_seconds", "views",
  *       "format", "codec", "height", "not_converted", "uploaded_at",
  *       "quality", "tile_gradient": ["#a","#b"],
  *       "categories": ["<name>", ...]   // DENORMALIZED, de-duplicated names only
@@ -34,7 +35,8 @@ require_once __DIR__ . '/Crypto7z.php';
  * Per-video metadata schema (Video{ID}/{ID}.json — the source of truth for a
  * single video's category assignments):
  * {
- *   "id", "title", "description", "creator", "length_seconds", "views",
+ *   "id", "title", "description", "creators": ["<name>", ...],
+ *   "length_seconds", "views",
  *   "format", "codec", "height", "quality", "not_converted", "uploaded_at",
  *   "categories": [ {"name": "<global category name>", "timestamp_seconds": 0} ],
  *   "preview_capture_seconds"

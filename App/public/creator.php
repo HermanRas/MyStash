@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/../src/Session.php';
-require __DIR__ . '/../src/CreatorStore.php';
+require_once __DIR__ . '/../src/Session.php';
+require_once __DIR__ . '/../src/CreatorStore.php';
+require_once __DIR__ . '/../src/VideoCreators.php';
 
 use MyStash\CreatorStore;
 use MyStash\Session;
+use MyStash\VideoCreators;
 
 Session::requireLogin();
 
@@ -24,7 +26,7 @@ $editCreator = ($editing !== null && $editing !== '')
 
 function videoCount(array $videos, string $creatorName): int
 {
-    return count(array_filter($videos, static fn($v) => $v['creator'] === $creatorName));
+    return VideoCreators::videoCount(['videos' => $videos], $creatorName);
 }
 
 function avatarUrl(array $creator): ?string

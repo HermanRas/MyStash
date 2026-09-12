@@ -47,7 +47,7 @@ Because the password *is* the encryption key and is never stored, a forgotten pa
 
 ### 2.3 Upload
 
-1. User uploads a video file. `creator` defaults to `default`; `format` is whatever was uploaded.
+1. User uploads a video file. The creator list defaults to `[default]`; `format` is whatever was uploaded.
 2. If the uploaded format is not MP4 (H.265/HEVC), the video is tagged `not converted`.
 3. On ingestion, the app generates:
    - **A preview image** — by default the frame at 15s. The user may instead pick a different timestamp, or upload their own image. This can be changed after upload, from the video's edit screen.
@@ -76,7 +76,7 @@ Quality follows the standard tiers, keyed on vertical pixel count (`p` = progres
 
 ### 2.5 Edit / Delete
 
-- **Video edit:** available from the video watch page; edits title, description, creator and category assignments. Quality and "not converted" are not editable — see §2.3.
+- **Video edit:** available from the video watch page; edits title, description, creators and category assignments. Quality and "not converted" are not editable — see §2.3.
 - **Creator edit:** available from the user dropdown in the nav bar ("manage creators"); edits name, age, gender, bio and profile picture. Renaming a creator repoints every video that referenced the old name; the creator's ID and files stay put.
 - **Delete:** removes a video (and its datastore files), or a Creator (and their record + profile picture, reassigning their videos to `default`).
 
@@ -140,6 +140,8 @@ App/Data/{user}/creators/Creator{ID}/{ID}.json.enc             # encrypted creat
 App/Data/{user}/creators/Creator{ID}/{ID}.profile.png.enc      # encrypted creator profile picture
 App/Data/{user}/**/*.enc.old                                   # transient safety copy during re-encryption only
 ```
+
+**A video may credit more than one creator.** Both the index entry and the per-video metadata carry `"creators": ["<name>", ...]`, and the edit screen offers the global creator list as checkboxes. Every video has at least one: emptying the list falls back to `default`, the creator ingestion assigns and the only one that cannot be deleted. Deleting a creator drops them from every video they were on rather than reassigning the whole video, so a video credited to two people keeps the other. Entries written before this carry a single `creator` string; reads go through `VideoCreators::of()`, and `bin/migrate_records.php` rewrites them.
 
 **Creators** are stored the same way videos are. The creator record (`{ID}.json`: id, name, age, gender, bio, created/updated timestamps) is authoritative; the index keeps a denormalized summary of each so the wall, the creator grid and the filter panel can render without decrypting every creator archive on each page load — the same arrangement as the category names on video entries. Creators are still keyed by **display name** in the index, because that is what a video's `creator` field references; the ID only addresses the files, and survives a rename. Uploaded profile pictures are normalised to PNG before encryption, so the stored filename always describes the actual bytes.
 
@@ -216,7 +218,7 @@ Top to bottom, single column (no side rail): **title**, player, meta line (views
 | Duration Badge | Bottom-right overlay | `rgba(0,0,0,0.8)` bg, white text, 11px, e.g. `14:20` |
 | Quality Badge | Bottom-left overlay | Small amber rounded tag, e.g. `4K`, `Full HD`, `480p` — derived from pixel height, see §2.3 |
 | Title | Below thumbnail | 14px, line-height 1.3, bold white, 2-line clamp + ellipsis |
-| Creator/Channel | Under title | 12px, `#888888` |
+| Creator/Channel | Under title | 12px, `#888888`. All credited creators, comma-separated |
 | Stats Line | Bottom row | 12px, `#888888`. Shows length, view count and categories, e.g. `14:20 • 128 views • Personal, Highlights`. No rating or score — there are no likes/ratings anywhere in the app |
 
 ### 4.4 Hover-to-Preview Technical Specification

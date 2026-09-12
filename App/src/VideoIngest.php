@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MyStash;
 
 require_once __DIR__ . '/VideoQuality.php';
+require_once __DIR__ . '/VideoCreators.php';
 
 /**
  * Upload/ingestion pipeline (Docs/PLAN.md Phase 3, Docs/SPECIFICATIONS.md §2.3):
@@ -76,7 +77,7 @@ final class VideoIngest
                 'id' => $id,
                 'title' => pathinfo($originalFilename, PATHINFO_FILENAME),
                 'description' => '',
-                'creator' => 'default',
+                'creators' => [VideoCreators::DEFAULT_CREATOR],
                 'length_seconds' => (int) round($duration),
                 'views' => 0,
                 'format' => $ext,
@@ -103,7 +104,7 @@ final class VideoIngest
                 'id' => $id,
                 'title' => $metadata['title'],
                 'description' => '',
-                'creator' => 'default',
+                'creators' => $metadata['creators'],
                 'length_seconds' => $metadata['length_seconds'],
                 'views' => 0,
                 'format' => $ext,

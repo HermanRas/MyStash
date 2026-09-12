@@ -20,6 +20,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../src/Datastore.php';
+require_once __DIR__ . '/../src/VideoCreators.php';
 require_once __DIR__ . '/../src/VideoCategories.php';
 
 use MyStash\Datastore;
@@ -78,7 +79,7 @@ foreach ($index['videos'] as $video) {
         'id' => $id,
         'title' => $video['title'],
         'description' => $video['description'] ?? '',
-        'creator' => $video['creator'],
+        'creators' => MyStash\VideoCreators::of($video),
         'length_seconds' => $video['length_seconds'],
         'views' => $video['views'],
         'format' => $video['format'],

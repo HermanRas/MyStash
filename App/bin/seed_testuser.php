@@ -38,21 +38,21 @@ $sampleCreators = [
     ['3', 'Jamie K.', 34, 'Male'],
 ];
 
-// [id, title, creator, length, views, format, codec, height, gradient,
+// [id, title, creators, length, views, format, codec, height, gradient,
 //  daysAgo, category assignments] — quality and "not converted" are derived
 // from height/format/codec, never seeded directly (see VideoQuality).
 $samples = [
-    ['1', 'Evening Session — Full Walkthrough', 'default', 860, 128, 'mp4', 'h264', 1080, ['#3a3a3a', '#161616'], 2,
+    ['1', 'Evening Session — Full Walkthrough', ['default'], 860, 128, 'mp4', 'h264', 1080, ['#3a3a3a', '#161616'], 2,
         [['name' => 'Personal', 'timestamp_seconds' => 0], ['name' => 'Personal', 'timestamp_seconds' => 225]]],
-    ['2', 'Studio Test Clip 01', 'Alex R.', 342, 34, 'mp4', 'hevc', 2160, ['#4a3a2a', '#1a1410'], 9,
+    ['2', 'Studio Test Clip 01', ['Alex R.'], 342, 34, 'mp4', 'hevc', 2160, ['#4a3a2a', '#1a1410'], 9,
         [['name' => 'Highlights', 'timestamp_seconds' => 0]]],
-    ['3', 'Behind the Scenes — Raw Footage', 'default', 1325, 9, 'mov', 'h264', 480, ['#2a3a3a', '#101a1a'], 21,
+    ['3', 'Behind the Scenes — Raw Footage', ['default', 'Jamie K.'], 1325, 9, 'mov', 'h264', 480, ['#2a3a3a', '#101a1a'], 21,
         [['name' => 'Not Converted', 'timestamp_seconds' => 0]]],
-    ['4', 'Quick Recap Reel', 'Jamie K.', 491, 210, 'mp4', 'hevc', 1440, ['#3a2a3a', '#1a101a'], 4,
+    ['4', 'Quick Recap Reel', ['Jamie K.'], 491, 210, 'mp4', 'hevc', 1440, ['#3a2a3a', '#1a101a'], 4,
         [['name' => 'Highlights', 'timestamp_seconds' => 0], ['name' => 'Personal', 'timestamp_seconds' => 120]]],
-    ['5', 'Long-Form Interview Draft', 'default', 4210, 17, 'mp4', 'hevc', 720, ['#3a3a2a', '#181810'], 1,
+    ['5', 'Long-Form Interview Draft', ['default'], 4210, 17, 'mp4', 'hevc', 720, ['#3a3a2a', '#181810'], 1,
         [['name' => 'Personal', 'timestamp_seconds' => 0]]],
-    ['6', 'Preview Clip Sample', 'Alex R.', 178, 5, 'mp4', 'hevc', 360, ['#2a2a3a', '#10101a'], 40,
+    ['6', 'Preview Clip Sample', ['Alex R.', 'default'], 178, 5, 'mp4', 'hevc', 360, ['#2a2a3a', '#10101a'], 40,
         [['name' => 'Personal', 'timestamp_seconds' => 0]]],
 ];
 
@@ -86,14 +86,14 @@ foreach ($sampleCreators as [$id, $name, $age, $gender]) {
     $datastore->saveCreatorMetadata($user, $password, $id, $record);
 }
 
-foreach ($samples as [$id, $title, $creator, $length, $views, $format, $codec, $height, $gradient, $daysAgo, $assignments]) {
+foreach ($samples as [$id, $title, $videoCreators, $length, $views, $format, $codec, $height, $gradient, $daysAgo, $assignments]) {
     $uploadedAt = date('c', strtotime("-{$daysAgo} days"));
 
     $entry = VideoQuality::apply([
         'id' => $id,
         'title' => $title,
         'description' => '',
-        'creator' => $creator,
+        'creators' => $videoCreators,
         'length_seconds' => $length,
         'views' => $views,
         'format' => $format,
@@ -110,7 +110,7 @@ foreach ($samples as [$id, $title, $creator, $length, $views, $format, $codec, $
         'id' => $id,
         'title' => $title,
         'description' => '',
-        'creator' => $creator,
+        'creators' => $videoCreators,
         'length_seconds' => $length,
         'views' => $views,
         'format' => $format,

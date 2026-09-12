@@ -7,6 +7,7 @@ namespace MyStash;
 require_once __DIR__ . '/Crypto7z.php';
 require_once __DIR__ . '/Datastore.php';
 require_once __DIR__ . '/VideoEncoder.php';
+require_once __DIR__ . '/VideoCreators.php';
 
 /**
  * Creator records, stored the same way videos are: an encrypted per-creator
@@ -75,13 +76,7 @@ final class CreatorStore
 
         if ($originalName !== '' && $originalName !== $name) {
             unset($index['creators'][$originalName]);
-
-            foreach ($index['videos'] ?? [] as &$video) {
-                if ($video['creator'] === $originalName) {
-                    $video['creator'] = $name;
-                }
-            }
-            unset($video);
+            VideoCreators::rename($index, $originalName, $name);
         }
 
         $index['creators'][$name] = [
@@ -140,20 +135,15 @@ final class CreatorStore
 
     /**
      * Removes a creator: their archive directory, their index entry, and the
-     * reference from every video they were on (reassigned to `default`).
+     * reference from every video they were on. A video left with no creators
+     * falls back to `default`.
      */
     public function delete(string $user, array &$index, string $name): void
     {
         $id = (string) ($index['creators'][$name]['id'] ?? '');
 
         unset($index['creators'][$name]);
-
-        foreach ($index['videos'] ?? [] as &$video) {
-            if ($video['creator'] === $name) {
-                $video['creator'] = 'default';
-            }
-        }
-        unset($video);
+        VideoCreators::remove($index, $name);
 
         if ($id !== '') {
             Datastore::wipe(Datastore::creatorDir($user, $id));

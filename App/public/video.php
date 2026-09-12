@@ -5,10 +5,12 @@ declare(strict_types=1);
 require_once __DIR__ . '/../src/Session.php';
 require_once __DIR__ . '/../src/VideoCategories.php';
 require_once __DIR__ . '/../src/CreatorStore.php';
+require_once __DIR__ . '/../src/VideoCreators.php';
 
 use MyStash\CreatorStore;
 use MyStash\Session;
 use MyStash\VideoCategories;
+use MyStash\VideoCreators;
 
 Session::requireLogin();
 
@@ -35,10 +37,16 @@ if ($video === null) {
 $editing = isset($_GET['edit']);
 $assignments = (new VideoCategories())->load(Session::user(), Session::password(), $id);
 
-$creatorId = (string) ($creators[$video['creator']]['id'] ?? '');
-$creatorAvatar = CreatorStore::hasProfileImage(Session::user(), $creatorId)
-    ? 'media.php?type=avatar&creator=' . urlencode($creatorId)
-    : null;
+$videoCreators = VideoCreators::of($video);
+
+function creatorAvatarUrl(array $creators, string $name): ?string
+{
+    $id = (string) ($creators[$name]['id'] ?? '');
+
+    return CreatorStore::hasProfileImage(Session::user(), $id)
+        ? 'media.php?type=avatar&creator=' . urlencode($id)
+        : null;
+}
 
 function formatLength(int $seconds): string
 {
@@ -92,19 +100,23 @@ $navActive = 'videos';
       <?php endforeach; ?>
     </div>
 
-    <?php /* The creator sits below the categories rather than in a side rail. */ ?>
-    <div class="section-title">Creator</div>
-    <a class="card creator-strip" href="creator.php?edit=<?= urlencode($video['creator']) ?>">
-      <div class="creator-avatar" style="width:56px; height:56px; margin:0;">
-        <?php if ($creatorAvatar !== null): ?>
-          <img src="<?= htmlspecialchars($creatorAvatar, ENT_QUOTES) ?>" alt="">
-        <?php endif; ?>
-      </div>
-      <div>
-        <div class="creator-name"><?= htmlspecialchars($video['creator'], ENT_QUOTES) ?></div>
-        <div class="creator-meta"><?= htmlspecialchars($creators[$video['creator']]['bio'] ?? '', ENT_QUOTES) ?: 'no bio set' ?></div>
-      </div>
-    </a>
+    <?php /* Creators sit below the categories rather than in a side rail. A
+             video may credit more than one, so this is a list. */ ?>
+    <div class="section-title">Creator<?= count($videoCreators) === 1 ? '' : 's' ?></div>
+    <?php foreach ($videoCreators as $creatorName): ?>
+      <?php $avatar = creatorAvatarUrl($creators, $creatorName); ?>
+      <a class="card creator-strip" href="creator.php?edit=<?= urlencode($creatorName) ?>">
+        <div class="creator-avatar" style="width:56px; height:56px; margin:0;">
+          <?php if ($avatar !== null): ?>
+            <img src="<?= htmlspecialchars($avatar, ENT_QUOTES) ?>" alt="">
+          <?php endif; ?>
+        </div>
+        <div>
+          <div class="creator-name"><?= htmlspecialchars($creatorName, ENT_QUOTES) ?></div>
+          <div class="creator-meta"><?= htmlspecialchars($creators[$creatorName]['bio'] ?? '', ENT_QUOTES) ?: 'no bio set' ?></div>
+        </div>
+      </a>
+    <?php endforeach; ?>
 
     <?php if (!$editing): ?>
       <a class="btn secondary" style="width:auto; margin-top:16px; padding:8px 20px; display:inline-block;" href="video.php?id=<?= urlencode($id) ?>&edit=1">Edit Video</a>
@@ -134,12 +146,17 @@ $navActive = 'videos';
             <input type="text" id="v-description" name="description" value="<?= htmlspecialchars($video['description'] ?? '', ENT_QUOTES) ?>">
           </div>
           <div class="field">
-            <label for="v-creator">Creator</label>
-            <select id="v-creator" name="creator">
-              <?php foreach (array_keys($creators) as $name): ?>
-                <option value="<?= htmlspecialchars($name, ENT_QUOTES) ?>" <?= $name === $video['creator'] ? 'selected' : '' ?>><?= htmlspecialchars($name, ENT_QUOTES) ?></option>
-              <?php endforeach; ?>
-            </select>
+            <label>Creators</label>
+            <?php foreach (array_keys($creators) as $name): ?>
+              <div class="field inline-check" style="margin-bottom:6px;">
+                <label>
+                  <input type="checkbox" name="creators[]" value="<?= htmlspecialchars($name, ENT_QUOTES) ?>"
+                         <?= in_array($name, $videoCreators, true) ? 'checked' : '' ?>>
+                  <?= htmlspecialchars($name, ENT_QUOTES) ?>
+                </label>
+              </div>
+            <?php endforeach; ?>
+            <p class="hint" style="margin:6px 0 0;">A video can credit more than one creator. Tick none and it falls back to <code>default</code>.</p>
           </div>
           <button type="submit" class="btn" style="width:auto; padding:8px 20px;">Save Changes</button>
           <a class="btn secondary" style="width:auto; padding:8px 20px; display:inline-block;" href="video.php?id=<?= urlencode($id) ?>">Cancel</a>

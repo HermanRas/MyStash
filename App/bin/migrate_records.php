@@ -11,6 +11,7 @@ declare(strict_types=1);
  *    exists, otherwise inferred from the legacy quality badge) and recomputes
  *    `quality` / `not_converted` from it
  *  - backfills `uploaded_at` on index entries from the per-video metadata
+ *  - converts each video's single `creator` into a `creators` list
  *  - drops the "Most Recent" category, which was never a category — it is a
  *    sort order, and now lives in the wall's sort menu
  *
@@ -23,10 +24,12 @@ require_once __DIR__ . '/../src/Datastore.php';
 require_once __DIR__ . '/../src/CreatorStore.php';
 require_once __DIR__ . '/../src/VideoEncoder.php';
 require_once __DIR__ . '/../src/VideoQuality.php';
+require_once __DIR__ . '/../src/VideoCreators.php';
 
 use MyStash\Crypto7z;
 use MyStash\Datastore;
 use MyStash\VideoEncoder;
+use MyStash\VideoCreators;
 use MyStash\VideoQuality;
 
 [$user, $password] = [$argv[1] ?? '', $argv[2] ?? ''];
@@ -98,17 +101,20 @@ foreach ($index['videos'] as &$video) {
 
     $video['height'] = $height;
     $video['uploaded_at'] = $video['uploaded_at'] ?? $metadata['uploaded_at'] ?? null;
+    $video = VideoCreators::set($video, VideoCreators::of($video));
     $video = VideoQuality::apply($video);
 
     if ($metadata !== null) {
+        $metadata = VideoCreators::set($metadata, VideoCreators::of($metadata));
         $datastore->saveVideoMetadata($user, $password, $id, VideoQuality::apply([
             ...$metadata,
             'height' => $height,
         ]));
     }
 
-    printf("video %s: height=%s quality=%s not_converted=%s\n",
-        $id, $height ?? 'unknown', $video['quality'] ?? 'none', $video['not_converted'] ? 'yes' : 'no');
+    printf("video %s: height=%s quality=%s not_converted=%s creators=%s\n",
+        $id, $height ?? 'unknown', $video['quality'] ?? 'none',
+        $video['not_converted'] ? 'yes' : 'no', implode('+', $video['creators']));
 }
 unset($video);
 

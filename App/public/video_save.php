@@ -5,9 +5,11 @@ declare(strict_types=1);
 require_once __DIR__ . '/../src/Session.php';
 require_once __DIR__ . '/../src/VideoCategories.php';
 require_once __DIR__ . '/../src/VideoQuality.php';
+require_once __DIR__ . '/../src/VideoCreators.php';
 
 use MyStash\Datastore;
 use MyStash\Session;
+use MyStash\VideoCreators;
 use MyStash\VideoQuality;
 
 Session::requireLogin();
@@ -28,7 +30,9 @@ foreach ($index['videos'] as &$video) {
     if ($video['id'] === $id) {
         $video['title'] = trim((string) ($_POST['title'] ?? '')) ?: $video['title'];
         $video['description'] = trim((string) ($_POST['description'] ?? ''));
-        $video['creator'] = (string) ($_POST['creator'] ?? $video['creator']);
+        // A video may credit several creators; an empty list falls back to
+        // `default` (VideoCreators::of).
+        $video = VideoCreators::set($video, (array) ($_POST['creators'] ?? []));
 
         // Quality and "Not Converted" describe the file, not the user's
         // opinion of it: they are recalculated here on every save and are
@@ -38,7 +42,7 @@ foreach ($index['videos'] as &$video) {
         $fields = [
             'title' => $video['title'],
             'description' => $video['description'],
-            'creator' => $video['creator'],
+            'creators' => $video['creators'],
             'height' => $video['height'] ?? null,
             'quality' => $video['quality'],
             'not_converted' => $video['not_converted'],
@@ -50,7 +54,9 @@ unset($video);
 
 $metadata = $datastore->loadVideoMetadata(Session::user(), Session::password(), $id);
 if ($metadata !== null && $fields !== []) {
-    $datastore->saveVideoMetadata(Session::user(), Session::password(), $id, [...$metadata, ...$fields]);
+    $metadata = [...$metadata, ...$fields];
+    unset($metadata['creator']);
+    $datastore->saveVideoMetadata(Session::user(), Session::password(), $id, $metadata);
 }
 
 $datastore->saveIndex(Session::user(), Session::password(), $index);

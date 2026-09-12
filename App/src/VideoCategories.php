@@ -6,6 +6,7 @@ namespace MyStash;
 
 require_once __DIR__ . '/Crypto7z.php';
 require_once __DIR__ . '/Datastore.php';
+require_once __DIR__ . '/VideoCreators.php';
 
 /**
  * Category assignments for a video: a reference to a global category (by name)
@@ -73,7 +74,7 @@ final class VideoCategories
                     'id' => $video['id'],
                     'title' => $video['title'],
                     'description' => $video['description'] ?? '',
-                    'creator' => $video['creator'],
+                    'creators' => VideoCreators::of($video),
                     'length_seconds' => $video['length_seconds'],
                     'views' => $video['views'],
                     'format' => $video['format'],

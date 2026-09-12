@@ -44,18 +44,24 @@ const PASSWORD = process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg';
   await page.screenshot({ path: '/work/screenshots/icons_creator.png', fullPage: true });
 
   // Saving through the new out-of-form button must still submit the form.
-  const originalBio = await page.locator('#c-bio').inputValue();
+  // Round-trip the value through a scratch creator rather than editing real
+  // data — an earlier version of this test left its string in a real bio.
+  await page.goto(`${BASE}/creator.php?edit=`, { waitUntil: 'networkidle' });
+  await page.fill('#c-name', 'ZZ Scratch Creator');
+  const originalBio = '';
   await page.fill('#c-bio', 'Edited via the shared button row');
   await page.click('.form-actions .btn:has-text("Save Changes")');
   await page.waitForSelector('.creator-grid');
-  await page.goto(`${BASE}/creator.php?edit=${encodeURIComponent('Jamie K.')}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/creator.php?edit=${encodeURIComponent('ZZ Scratch Creator')}`, { waitUntil: 'networkidle' });
   check('the out-of-form Save button still saves',
     (await page.locator('#c-bio').inputValue()) === 'Edited via the shared button row');
 
-  // Put the bio back so the test leaves no trace in the stash.
-  await page.fill('#c-bio', originalBio);
-  await page.click('.form-actions .btn:has-text("Save Changes")');
+  // Delete the scratch creator so the test leaves no trace in the stash.
+  page.once('dialog', (d) => d.accept());
+  await page.click('.form-actions .btn:has-text("Delete Creator")');
   await page.waitForSelector('.creator-grid');
+  check('the scratch creator is gone',
+    !(await page.locator('.creator-grid').innerText()).includes('ZZ Scratch Creator'));
 
   await page.goto(`${BASE}/category.php`, { waitUntil: 'networkidle' });
   await page.screenshot({ path: '/work/screenshots/icons_categories.png' });

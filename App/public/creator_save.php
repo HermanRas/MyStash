@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/../src/Crypto7z.php';
-require __DIR__ . '/../src/Datastore.php';
-require __DIR__ . '/../src/Session.php';
-require __DIR__ . '/../src/CreatorStore.php';
+require_once __DIR__ . '/../src/Crypto7z.php';
+require_once __DIR__ . '/../src/Datastore.php';
+require_once __DIR__ . '/../src/Session.php';
+require_once __DIR__ . '/../src/CreatorStore.php';
 
 use MyStash\CreatorStore;
 use MyStash\Datastore;
