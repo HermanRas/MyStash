@@ -64,6 +64,7 @@ a {
 }
 
 .search-bar {
+  position: relative;
   flex: 1;
   max-width: 640px;
 }
@@ -80,6 +81,28 @@ a {
 
 .search-bar input:focus {
   outline: 2px solid var(--accent);
+}
+
+/* Only rendered while a search is active — a way back to the whole wall
+   without having to clear the box by hand. */
+.search-clear {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.search-clear:hover {
+  color: var(--text);
+}
+
+/* Leave room for the clear button so a long term doesn't run underneath it. */
+.search-bar:has(.search-clear) input {
+  padding-right: 32px;
 }
 
 .header-actions {
@@ -580,6 +603,19 @@ select option {
 .wall-count {
   font-size: 12px;
   color: var(--text-muted);
+}
+
+/* The searched-for term, echoed back in the count line and the empty state. */
+.wall-term {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.wall-term::before,
+.wall-term::after {
+  content: '"';
+  color: var(--text-muted);
+  font-weight: 400;
 }
 
 .sort-form {

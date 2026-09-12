@@ -37,6 +37,13 @@ final class VideoQuery
     public const MAX_LENGTH_MINUTES = 180;
 
     /**
+     * Longest search term accepted. A search runs over the already-decrypted
+     * index, so this is not about cost — it just stops a pathological URL from
+     * being echoed back into the input.
+     */
+    public const MAX_SEARCH_LENGTH = 100;
+
+    /**
      * @param list<string> $categories
      * @param list<string> $creators
      */
@@ -46,6 +53,7 @@ final class VideoQuery
         public readonly int $minMinutes,
         public readonly int $maxMinutes,
         public readonly string $sort,
+        public readonly string $search,
     ) {
     }
 
@@ -68,15 +76,61 @@ final class VideoQuery
             $sort = self::DEFAULT_SORT;
         }
 
-        return new self($categories, $creators, $min, $max, $sort);
+        // `q[]=x` would otherwise reach the search as the string "Array".
+        $search = is_array($query['q'] ?? null) ? '' : (string) ($query['q'] ?? '');
+        $search = mb_substr(trim(preg_replace('/\s+/u', ' ', $search) ?? ''), 0, self::MAX_SEARCH_LENGTH);
+
+        return new self($categories, $creators, $min, $max, $sort, $search);
     }
 
     public function isFiltered(): bool
     {
         return $this->categories !== []
             || $this->creators !== []
+            || $this->search !== ''
             || $this->minMinutes > 0
             || $this->maxMinutes < self::MAX_LENGTH_MINUTES;
+    }
+
+    /**
+     * Search terms, in the order typed. Several words all have to match, each
+     * possibly in a different field — so "jamie skate" finds a skating video by
+     * Jamie without either word having to match title and creator at once.
+     *
+     * @return list<string>
+     */
+    public function searchTerms(): array
+    {
+        return $this->search === '' ? [] : explode(' ', $this->search);
+    }
+
+    /**
+     * True when a video matches the search: every term appears somewhere in its
+     * title, one of its creators, or one of its category tags
+     * (Docs/PLAN.md 5.1). Matching is case-insensitive and on substrings, so
+     * "skat" finds "Skateboarding".
+     */
+    public function matchesSearch(array $video): bool
+    {
+        $terms = $this->searchTerms();
+
+        if ($terms === []) {
+            return true;
+        }
+
+        $haystack = implode("\n", array_merge(
+            [(string) ($video['title'] ?? '')],
+            VideoCreators::of($video),
+            array_map('strval', $video['categories'] ?? []),
+        ));
+
+        foreach ($terms as $term) {
+            if (mb_stripos($haystack, $term) === false) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function hasCategory(string $name): bool
@@ -96,6 +150,10 @@ final class VideoQuery
     public function apply(array $videos): array
     {
         $videos = array_values(array_filter($videos, function (array $video): bool {
+            if (!$this->matchesSearch($video)) {
+                return false;
+            }
+
             $minutes = ((int) ($video['length_seconds'] ?? 0)) / 60;
 
             if ($minutes < $this->minMinutes) {

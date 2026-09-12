@@ -86,7 +86,7 @@ All verified end-to-end via curl (edit/rename/delete/convert/tag add-delete/cate
 
 ## Phase 5 — Search, Filter, Sort, Playlists
 
-- [ ] 5.1 Video search by title, creator, category tags — includes wiring the header search input, which appears on every page today but is connected to nothing
+- [x] 5.1 Video search by title, creator and category tags, wired to the header search box — which appeared on every page but was connected to nothing. The term is a `q` in the query string handled by `App/src/VideoQuery.php`, so it composes with the filters and the sort and stays linkable. Several words all have to match but each may match a different field, so "jamie sport" finds a sport video credited to Jamie without either word matching both. Matching is case-insensitive and on substrings ("skat" finds "Skateboarding"), and runs against the already-decrypted index, so no video archive is opened to search. Searching from any page lands on the wall and deliberately carries no filters with it — the box searches the whole stash, and the filter panel is what narrows afterwards (it carries the term through). The count line and the empty state name the term, and a × in the box clears it.
 - [~] 5.2 Creator filter — filtering the wall **by creator** is done (checkboxes in the filter panel, applied server-side alongside the category and length filters). Filtering by a creator's *attributes* (age, gender) is still UI-only.
 - [x] 5.3 Video sort: title A→Z / Z→A, length short→long / long→short, views min→max / max→min, uploaded new→old / old→new — a sort menu on the wall toolbar, applied server-side (`App/src/VideoQuery.php`) so it composes with the filters and stays linkable
 - [ ] 5.4 Playlist creation and playback

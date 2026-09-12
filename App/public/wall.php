@@ -35,6 +35,7 @@ $sortIcon = match ($query->sort) {
 };
 
 $navActive = 'videos';
+$searchTerm = $query->search;
 $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="false" aria-controls="upload-panel">'
     . '<img class="btn-icon" src="assets/img/icons/upload.png" alt="">Upload</button>'
     . '<button class="icon-btn" id="filters-toggle" aria-expanded="true" aria-controls="filter-panel">'
@@ -72,6 +73,8 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
 
     <form method="get" action="wall.php" id="filter-form">
       <input type="hidden" name="sort" value="<?= htmlspecialchars($query->sort, ENT_QUOTES) ?>">
+      <?php /* Narrowing an existing search must not throw the search away. */ ?>
+      <input type="hidden" name="q" value="<?= htmlspecialchars($query->search, ENT_QUOTES) ?>">
 
       <?php /* Native <details> accordions — no JS needed. Categories is the
                one open by default; the others remember nothing between loads
@@ -147,7 +150,13 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
     <div class="wall-toolbar">
       <span class="wall-count">
         <?= count($videos) ?> of <?= $total ?> video<?= $total === 1 ? '' : 's' ?>
-        <?= $query->isFiltered() ? ' (filtered)' : '' ?>
+        <?php if ($query->search !== ''): ?>
+          matching <strong class="wall-term"><?= htmlspecialchars($query->search, ENT_QUOTES) ?></strong><?php
+            /* The filter panel may be narrowing the search further. */
+            ?><?= $query->categories !== [] || $query->creators !== [] || $query->minMinutes > 0 || $query->maxMinutes < VideoQuery::MAX_LENGTH_MINUTES ? ', filtered' : '' ?>
+        <?php elseif ($query->isFiltered()): ?>
+          (filtered)
+        <?php endif; ?>
       </span>
       <form method="get" action="wall.php" class="sort-form">
         <?php foreach ($query->categories as $name): ?>
@@ -158,6 +167,7 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
         <?php endforeach; ?>
         <input type="hidden" name="len_min" value="<?= $query->minMinutes ?>">
         <input type="hidden" name="len_max" value="<?= $query->maxMinutes ?>">
+        <input type="hidden" name="q" value="<?= htmlspecialchars($query->search, ENT_QUOTES) ?>">
         <label for="sort"><img class="btn-icon" src="assets/img/icons/<?= $sortIcon ?>.png" alt="">Sort</label>
         <select id="sort" name="sort" onchange="this.form.submit()">
           <?php foreach (VideoQuery::SORTS as $value => $label): ?>
@@ -194,7 +204,15 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
 
       <?php if ($videos === []): ?>
         <p class="hint">
-          <?= $query->isFiltered() ? 'No videos match these filters.' : 'No videos yet — upload one to get started.' ?>
+          <?php if ($query->search !== ''): ?>
+            Nothing matches <strong class="wall-term"><?= htmlspecialchars($query->search, ENT_QUOTES) ?></strong>
+            in any title, creator or category tag.
+            <a href="wall.php" style="color:var(--accent);">Clear the search</a>
+          <?php elseif ($query->isFiltered()): ?>
+            No videos match these filters.
+          <?php else: ?>
+            No videos yet — upload one to get started.
+          <?php endif; ?>
         </p>
       <?php endif; ?>
 

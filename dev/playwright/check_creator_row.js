@@ -15,8 +15,19 @@ const PASSWORD = process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg';
   await page.click('button[type="submit"]');
   await page.waitForSelector('.video-grid');
 
-  const href = await page.getAttribute('.video-card a, a.video-card', 'href');
-  const id = (href || '').replace(/.*id=/, '').split('&')[0];
+  // Pick a video that actually credits several creators — the tile lists them
+  // comma-separated — rather than whichever happens to sort first.
+  const multi = await page.$$eval('.video-card', (cards) => cards
+    .filter((card) => (card.querySelector('.tile-creator')?.innerText || '').includes(','))
+    .map((card) => card.getAttribute('href')));
+
+  if (multi.length === 0) {
+    console.log('SKIP: no video in this stash credits more than one creator');
+    await browser.close();
+    return;
+  }
+
+  const id = multi[0].replace(/.*id=/, '').split('&')[0];
 
   await page.goto(`${BASE}/video.php?id=${id}`, { waitUntil: 'networkidle' });
   const strips = await page.$$eval('.creator-strip', (els) =>

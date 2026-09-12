@@ -7,7 +7,8 @@ declare(strict_types=1);
  *
  * Callers set $navActive to 'videos', 'creators' or 'categories' before
  * including this, and may set $headerActions to extra HTML for the right-hand
- * button group.
+ * button group. The wall sets $searchTerm so the box still shows what was
+ * searched for after the results load.
  *
  * The nav carries exactly three pills. Category names deliberately do NOT
  * appear here: they live in the wall's left filter panel, and having both was
@@ -15,10 +16,16 @@ declare(strict_types=1);
  * it doubles as the reset for whatever filters are applied.
  */
 
+// The search box is on every page, and it is a wall query — so the header
+// needs VideoQuery whether or not the including page uses it.
+require_once __DIR__ . '/../src/VideoQuery.php';
+
 use MyStash\Session;
+use MyStash\VideoQuery;
 
 $navActive = $navActive ?? '';
 $headerActions = $headerActions ?? '';
+$searchTerm = $searchTerm ?? '';
 
 // Icons are sliced from the generated sheet in Docs/Assets/site_icons.png.
 $navPills = [
@@ -33,9 +40,19 @@ $navPills = [
     MyStash
   </a>
 
-  <div class="search-bar">
-    <input type="text" placeholder="Search videos, creators, categories…">
-  </div>
+  <?php /* Searching always lands on the wall, from whichever page you were on.
+           It deliberately carries no filters with it: the header box searches
+           the whole stash, and narrowing down afterwards is what the filter
+           panel is for (which does carry the search term through). */ ?>
+  <form class="search-bar" method="get" action="wall.php" role="search">
+    <input type="text" name="q" aria-label="Search"
+           maxlength="<?= VideoQuery::MAX_SEARCH_LENGTH ?>"
+           value="<?= htmlspecialchars($searchTerm, ENT_QUOTES) ?>"
+           placeholder="Search videos, creators, categories…">
+    <?php if ($searchTerm !== ''): ?>
+      <a class="search-clear" href="wall.php" aria-label="Clear search">&times;</a>
+    <?php endif; ?>
+  </form>
 
   <div class="header-actions">
     <?= $headerActions ?>
