@@ -5,7 +5,9 @@ declare(strict_types=1);
 require __DIR__ . '/../src/Crypto7z.php';
 require __DIR__ . '/../src/Datastore.php';
 require __DIR__ . '/../src/Session.php';
+require __DIR__ . '/../src/CreatorStore.php';
 
+use MyStash\CreatorStore;
 use MyStash\Datastore;
 use MyStash\Session;
 
@@ -25,14 +27,9 @@ if ($name === '' || $name === 'default') {
 
 $index = Session::refreshIndex();
 
-unset($index['creators'][$name]);
-
-foreach ($index['videos'] as &$video) {
-    if ($video['creator'] === $name) {
-        $video['creator'] = 'default';
-    }
-}
-unset($video);
+// Drops the index entry, wipes the creator's encrypted record and profile
+// picture, and reassigns their videos to `default`.
+(new CreatorStore())->delete(Session::user(), $index, $name);
 
 Session::setIndex($index);
 (new Datastore())->saveIndex(Session::user(), Session::password(), $index);

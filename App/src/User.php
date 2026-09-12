@@ -25,6 +25,15 @@ final class User
 
     private const MAX_NAME_LENGTH = 32;
 
+    /**
+     * The password is the encryption key for the entire stash and is never
+     * stored, so it cannot be reset, rotated on breach, or rate-limited at the
+     * archive itself — anyone holding a copy of the .7z files can attack it
+     * offline at whatever speed their hardware allows. Length is therefore the
+     * only defence, and 24 characters is the floor.
+     */
+    public const MIN_PASSWORD_LENGTH = 24;
+
     public function __construct(private Datastore $datastore = new Datastore())
     {
     }
@@ -34,6 +43,11 @@ final class User
         return $name !== ''
             && strlen($name) <= self::MAX_NAME_LENGTH
             && preg_match(self::NAME_PATTERN, $name) === 1;
+    }
+
+    public static function isValidPassword(string $password): bool
+    {
+        return strlen($password) >= self::MIN_PASSWORD_LENGTH;
     }
 
     public function exists(string $name): bool
@@ -47,18 +61,29 @@ final class User
      */
     public function create(string $name, string $password): bool
     {
-        if (!self::isValidName($name) || $this->exists($name) || $password === '') {
+        if (!self::isValidName($name) || $this->exists($name) || !self::isValidPassword($password)) {
             return false;
         }
+
+        // Uploads default to the "default" creator, so it must exist — with its
+        // own record file, like every other creator (see CreatorStore).
+        $default = [
+            'id' => '1',
+            'name' => 'default',
+            'age' => null,
+            'gender' => null,
+            'bio' => '',
+            'verified' => false,
+            'created_at' => date('c'),
+        ];
+
+        $this->datastore->saveCreatorMetadata($name, $password, '1', $default);
 
         return $this->datastore->saveIndex($name, $password, [
             // "Not Converted" is assigned automatically during ingestion, so a
             // new stash needs it defined up front for the tag to resolve.
             'categories' => ['Not Converted' => '#cc4444'],
-            // Uploads default to the "default" creator, so it must exist.
-            'creators' => [
-                'default' => ['name' => 'default', 'age' => null, 'gender' => null, 'bio' => '', 'verified' => false],
-            ],
+            'creators' => ['default' => $default],
             'videos' => [],
         ]);
     }

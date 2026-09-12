@@ -120,6 +120,25 @@ final class VideoEncoder
     }
 
     /**
+     * Re-encodes any image ffmpeg can read into $outputPath's format, scaled to
+     * fit within $maxEdge on its longest side. Used to normalise uploaded
+     * creator avatars to PNG (see CreatorStore).
+     */
+    public function convertImage(string $inputPath, string $outputPath, int $maxEdge = 512): bool
+    {
+        $command = [
+            $this->ffmpeg,
+            '-y',
+            '-i', $inputPath,
+            '-vf', "scale='min({$maxEdge},iw)':-2",
+            '-frames:v', '1',
+            $outputPath,
+        ];
+
+        return $this->run($command)[0] === 0;
+    }
+
+    /**
      * Builds the silent preview clip: a timelapse that samples one frame every
      * $intervalSeconds across the whole video and plays them back at
      * $playbackFps, so hovering skims the entire video rather than showing one

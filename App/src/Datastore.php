@@ -16,22 +16,26 @@ require_once __DIR__ . '/Crypto7z.php';
  * Index schema ({user}.json — the global, per-user record):
  * {
  *   "categories": { "<name>": "<hex color>" },   // global category definitions
- *   "creators":   { "<name>": {"name","age","gender","bio","verified"} },
+ *   "creators":   { "<name>": {"id","name","age","gender","bio","verified"} },
+ *                                                // DENORMALIZED — see CreatorStore
  *   "videos": [
  *     {
  *       "id", "title", "description", "creator", "length_seconds", "views",
- *       "format", "codec", "not_converted",
+ *       "format", "codec", "height", "not_converted", "uploaded_at",
  *       "quality", "tile_gradient": ["#a","#b"],
  *       "categories": ["<name>", ...]   // DENORMALIZED, de-duplicated names only
  *     }
  *   ]
  * }
  *
+ * `quality` and `not_converted` are DERIVED from height/format/codec and are
+ * never user-editable — VideoQuality::apply() is the only thing that sets them.
+ *
  * Per-video metadata schema (Video{ID}/{ID}.json — the source of truth for a
  * single video's category assignments):
  * {
  *   "id", "title", "description", "creator", "length_seconds", "views",
- *   "format", "codec", "not_converted", "uploaded_at",
+ *   "format", "codec", "height", "quality", "not_converted", "uploaded_at",
  *   "categories": [ {"name": "<global category name>", "timestamp_seconds": 0} ],
  *   "preview_capture_seconds"
  * }
@@ -65,6 +69,11 @@ final class Datastore
         return self::DATA_ROOT . "/{$user}/videos/Video{$id}";
     }
 
+    public static function creatorDir(string $user, string $id): string
+    {
+        return self::DATA_ROOT . "/{$user}/creators/Creator{$id}";
+    }
+
     /**
      * One more than the highest existing numeric video ID in the index.
      */
@@ -73,6 +82,19 @@ final class Datastore
         $max = 0;
         foreach ($index['videos'] ?? [] as $video) {
             $max = max($max, (int) $video['id']);
+        }
+
+        return (string) ($max + 1);
+    }
+
+    /**
+     * One more than the highest creator ID already handed out in the index.
+     */
+    public static function nextCreatorId(array $index): string
+    {
+        $max = 0;
+        foreach ($index['creators'] ?? [] as $creator) {
+            $max = max($max, (int) ($creator['id'] ?? 0));
         }
 
         return (string) ($max + 1);
@@ -132,6 +154,21 @@ final class Datastore
     public function saveVideoMetadata(string $user, string $password, string $id, array $metadata): bool
     {
         $dir = self::videoDir($user, $id);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0700, true);
+        }
+
+        return $this->saveJsonArchive("{$dir}/{$id}.json.enc", "{$id}.json", $password, $metadata);
+    }
+
+    public function loadCreatorMetadata(string $user, string $password, string $id): ?array
+    {
+        return $this->loadJsonArchive(self::creatorDir($user, $id) . "/{$id}.json.enc", "{$id}.json", $password);
+    }
+
+    public function saveCreatorMetadata(string $user, string $password, string $id, array $metadata): bool
+    {
+        $dir = self::creatorDir($user, $id);
         if (!is_dir($dir)) {
             mkdir($dir, 0700, true);
         }

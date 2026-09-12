@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 require __DIR__ . '/../src/Crypto7z.php';
 require __DIR__ . '/../src/VideoEncoder.php';
+require __DIR__ . '/../src/VideoQuality.php';
+require __DIR__ . '/../src/User.php';
 
 use MyStash\Crypto7z;
+use MyStash\User;
 use MyStash\VideoEncoder;
+use MyStash\VideoQuality;
 
 function step(string $label, bool $ok): void
 {
@@ -73,6 +77,36 @@ step(
         $clipDuration,
     ),
     $clipDuration > 0 && $clipDuration < $fixtureDuration,
+);
+
+// Derived tags (Docs/SPECIFICATIONS.md §2.3) — pure logic, no ffmpeg needed.
+$qualityCases = [
+    [4320, '8K'], [2160, '4K'], [1440, '2K'], [1080, 'Full HD'],
+    [720, 'HD'], [480, '480p'], [360, '360p'],
+    // Between tiers a video takes the lower one; below every tier it is just SD.
+    [1439, 'Full HD'], [719, '480p'], [240, 'SD'], [null, null],
+];
+
+foreach ($qualityCases as [$height, $expected]) {
+    step(
+        sprintf('quality tag for height %s is %s', $height ?? 'unknown', $expected ?? 'none'),
+        VideoQuality::tagForHeight($height) === $expected,
+    );
+}
+
+step('mp4/hevc counts as converted', VideoQuality::isNotConverted('mp4', 'hevc') === false);
+step('mp4/h264 counts as not converted', VideoQuality::isNotConverted('mp4', 'h264') === true);
+step('mov/hevc counts as not converted', VideoQuality::isNotConverted('mov', 'hevc') === true);
+
+$fileHeight = $encoder->videoHeight($fixture);
+step(
+    sprintf('ffprobe reads the fixture height (%s) and it tags as %s', $fileHeight ?? 'null', VideoQuality::tagForHeight($fileHeight) ?? 'none'),
+    $fileHeight !== null,
+);
+
+step(
+    'a 23-character password is rejected, 24 accepted',
+    !User::isValidPassword(str_repeat('a', 23)) && User::isValidPassword(str_repeat('a', 24)),
 );
 
 echo PHP_EOL . "All smoke tests passed." . PHP_EOL;

@@ -10,9 +10,14 @@ use MyStash\Crypto7z;
 use MyStash\Datastore;
 use MyStash\Session;
 
+require __DIR__ . '/../src/CreatorStore.php';
+
+use MyStash\CreatorStore;
+
 /**
  * Decrypt-on-the-fly media endpoint (Docs/PLAN.md Phase 4.0): serves the
- * preview thumbnail, preview clip, or full video for a given video ID.
+ * preview thumbnail, preview clip, or full video for a given video ID, or a
+ * creator's profile picture for a given creator ID.
  * Nothing is ever written back out decrypted to persistent disk — the
  * archive is extracted to tmpfs, streamed (with HTTP Range support for
  * video/mp4 seeking), then wiped.
@@ -29,13 +34,28 @@ $suffixes = [
     'video' => ['mp4.enc', 'video/mp4'],
 ];
 
-if ($id === '' || !isset($suffixes[$type])) {
-    http_response_code(400);
-    exit;
-}
+if ($type === 'avatar') {
+    // Creator profile pictures are addressed by creator ID, not video ID.
+    $creatorId = (string) ($_GET['creator'] ?? '');
 
-[$suffix, $contentType] = $suffixes[$type];
-$archivePath = Datastore::videoDir(Session::user(), $id) . "/{$id}.{$suffix}";
+    if ($creatorId === '' || !ctype_digit($creatorId)) {
+        http_response_code(400);
+        exit;
+    }
+
+    $archivePath = CreatorStore::profileImagePath(Session::user(), $creatorId);
+    $contentType = 'image/png';
+} else {
+    // IDs are digits and go straight into a filesystem path, so anything else
+    // is rejected rather than allowed to walk out of the data directory.
+    if (!ctype_digit($id) || !isset($suffixes[$type])) {
+        http_response_code(400);
+        exit;
+    }
+
+    [$suffix, $contentType] = $suffixes[$type];
+    $archivePath = Datastore::videoDir(Session::user(), $id) . "/{$id}.{$suffix}";
+}
 
 if (!file_exists($archivePath)) {
     http_response_code(404);

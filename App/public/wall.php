@@ -3,19 +3,26 @@
 declare(strict_types=1);
 
 require __DIR__ . '/../src/Session.php';
+require __DIR__ . '/../src/VideoQuery.php';
 
 use MyStash\Session;
+use MyStash\VideoQuery;
 
 Session::requireLogin();
 
 $index = Session::refreshIndex();
-$videos = $index['videos'] ?? [];
 $categories = $index['categories'] ?? [];
 $creators = $index['creators'] ?? [];
 
+$query = VideoQuery::fromRequest($_GET);
+$videos = $query->apply($index['videos'] ?? []);
+$total = count($index['videos'] ?? []);
+
 function formatLength(int $seconds): string
 {
-    return sprintf('%02d:%02d', intdiv($seconds, 60), $seconds % 60);
+    return $seconds >= 3600
+        ? sprintf('%d:%02d:%02d', intdiv($seconds, 3600), intdiv($seconds % 3600, 60), $seconds % 60)
+        : sprintf('%02d:%02d', intdiv($seconds, 60), $seconds % 60);
 }
 
 function creatorLabel(array $creators, string $name): string
@@ -24,6 +31,10 @@ function creatorLabel(array $creators, string $name): string
 
     return htmlspecialchars($name, ENT_QUOTES) . $verified;
 }
+
+$navActive = 'videos';
+$headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="false" aria-controls="upload-panel">+ Upload</button>'
+    . '<button class="icon-btn" id="filters-toggle" aria-expanded="true" aria-controls="filter-panel">Filters</button>';
 ?>
 <!doctype html>
 <html lang="en">
@@ -35,44 +46,7 @@ function creatorLabel(array $creators, string $name): string
 </head>
 <body>
 
-<header class="site-header">
-  <a class="brand" href="wall.php">
-    <img src="assets/img/icon.png" alt="MyStash">
-    MyStash
-  </a>
-
-  <div class="search-bar">
-    <input type="text" placeholder="Search videos, creators, categories…">
-  </div>
-
-  <div class="header-actions">
-    <button class="icon-btn" id="upload-toggle" aria-expanded="false" aria-controls="upload-panel">+ Upload</button>
-    <button class="icon-btn" id="filters-toggle" aria-expanded="true" aria-controls="filter-panel">Filters</button>
-    <div class="user-menu" tabindex="0">
-      <div class="user-menu-trigger">
-        <div class="avatar"></div>
-        <?= htmlspecialchars(Session::user(), ENT_QUOTES) ?>
-      </div>
-      <div class="user-menu-dropdown">
-        <a href="creator.php">Manage Creators</a>
-        <a href="category.php">Manage Categories</a>
-        <a href="user.html">Profile &amp; Password</a>
-        <a href="logout.php">Log Out</a>
-      </div>
-    </div>
-  </div>
-</header>
-
-<nav class="category-bar">
-  <span class="pill active">All</span>
-  <span class="pill">Most Recent</span>
-  <span class="pill">Not Converted</span>
-  <a class="pill" href="creator.php">Creators</a>
-  <?php foreach ($categories as $name => $color): ?>
-    <?php if (in_array($name, ['Most Recent', 'Not Converted'], true)) continue; ?>
-    <span class="pill"><?= htmlspecialchars($name, ENT_QUOTES) ?></span>
-  <?php endforeach; ?>
-</nav>
+<?php require __DIR__ . '/../views/header.php'; ?>
 
 <div class="upload-panel" id="upload-panel">
   <form action="upload.php" method="post" enctype="multipart/form-data">
@@ -90,56 +64,83 @@ function creatorLabel(array $creators, string $name): string
 
 <div class="layout">
   <aside class="filter-panel" id="filter-panel">
-    <div class="filter-section">
-      <h4>Videos</h4>
-      <div class="filter-row">
-        <label>Longer than <output id="len-min-out">0m</output></label>
-        <input type="range" id="len-min" min="0" max="60" step="1" value="0">
-      </div>
-      <div class="filter-row">
-        <label>Shorter than <output id="len-max-out">60m</output></label>
-        <input type="range" id="len-max" min="0" max="60" step="1" value="60">
-      </div>
-    </div>
+    <form method="get" action="wall.php" id="filter-form">
+      <input type="hidden" name="sort" value="<?= htmlspecialchars($query->sort, ENT_QUOTES) ?>">
 
-    <div class="filter-section">
-      <h4>Categories</h4>
-      <?php foreach ($categories as $name => $color): ?>
+      <div class="filter-section">
+        <h4>Videos</h4>
         <div class="filter-row">
-          <label style="font-weight:normal; justify-content:flex-start; gap:8px;">
-            <input type="checkbox" name="category[]" value="<?= htmlspecialchars($name, ENT_QUOTES) ?>">
-            <span class="dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:<?= htmlspecialchars($color, ENT_QUOTES) ?>"></span>
-            <?= htmlspecialchars($name, ENT_QUOTES) ?>
-          </label>
+          <label>Longer than <output id="len-min-out"><?= $query->minMinutes ?>m</output></label>
+          <input type="range" id="len-min" name="len_min" min="0" max="<?= VideoQuery::MAX_LENGTH_MINUTES ?>" step="1" value="<?= $query->minMinutes ?>">
         </div>
-      <?php endforeach; ?>
-    </div>
+        <div class="filter-row">
+          <label>Shorter than <output id="len-max-out"><?= $query->maxMinutes ?>m</output></label>
+          <input type="range" id="len-max" name="len_max" min="0" max="<?= VideoQuery::MAX_LENGTH_MINUTES ?>" step="1" value="<?= $query->maxMinutes ?>">
+        </div>
+      </div>
 
-    <div class="filter-section">
-      <h4>Creators</h4>
-      <div class="filter-row">
-        <label>Age at least <output id="age-min-out">18</output></label>
-        <input type="range" id="age-min" min="18" max="80" step="1" value="18">
+      <div class="filter-section">
+        <h4>Categories</h4>
+        <?php foreach ($categories as $name => $color): ?>
+          <div class="filter-row">
+            <label style="font-weight:normal; justify-content:flex-start; gap:8px;">
+              <input type="checkbox" name="category[]" value="<?= htmlspecialchars($name, ENT_QUOTES) ?>"
+                     <?= $query->hasCategory($name) ? 'checked' : '' ?>>
+              <span class="dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:<?= htmlspecialchars($color, ENT_QUOTES) ?>"></span>
+              <?= htmlspecialchars($name, ENT_QUOTES) ?>
+            </label>
+          </div>
+        <?php endforeach; ?>
       </div>
-      <div class="filter-row">
-        <label>Age at most <output id="age-max-out">80</output></label>
-        <input type="range" id="age-max" min="18" max="80" step="1" value="80">
-      </div>
-      <div class="filter-row">
-        <label>Gender</label>
-        <select>
-          <option value="">Any</option>
-          <option>Female</option>
-          <option>Male</option>
-          <option>Non-binary</option>
-        </select>
-      </div>
-    </div>
 
-    <button class="btn secondary" style="width:100%;">Reset Filters</button>
+      <div class="filter-section">
+        <h4>Creators</h4>
+        <div class="filter-row">
+          <label>Age at least <output id="age-min-out">18</output></label>
+          <input type="range" id="age-min" min="18" max="80" step="1" value="18">
+        </div>
+        <div class="filter-row">
+          <label>Age at most <output id="age-max-out">80</output></label>
+          <input type="range" id="age-max" min="18" max="80" step="1" value="80">
+        </div>
+        <div class="filter-row">
+          <label>Gender</label>
+          <select>
+            <option value="">Any</option>
+            <option>Female</option>
+            <option>Male</option>
+            <option>Non-binary</option>
+          </select>
+        </div>
+      </div>
+
+      <button type="submit" class="btn" style="width:100%;">Apply Filters</button>
+      <a class="btn secondary" style="width:100%; margin-top:8px; display:block; text-align:center; box-sizing:border-box;" href="wall.php">Reset Filters</a>
+    </form>
   </aside>
 
   <main class="container">
+    <div class="wall-toolbar">
+      <span class="wall-count">
+        <?= count($videos) ?> of <?= $total ?> video<?= $total === 1 ? '' : 's' ?>
+        <?= $query->isFiltered() ? ' (filtered)' : '' ?>
+      </span>
+      <form method="get" action="wall.php" class="sort-form">
+        <?php foreach ($query->categories as $name): ?>
+          <input type="hidden" name="category[]" value="<?= htmlspecialchars($name, ENT_QUOTES) ?>">
+        <?php endforeach; ?>
+        <input type="hidden" name="len_min" value="<?= $query->minMinutes ?>">
+        <input type="hidden" name="len_max" value="<?= $query->maxMinutes ?>">
+        <label for="sort">Sort</label>
+        <select id="sort" name="sort" onchange="this.form.submit()">
+          <?php foreach (VideoQuery::SORTS as $value => $label): ?>
+            <option value="<?= $value ?>" <?= $value === $query->sort ? 'selected' : '' ?>><?= $label ?></option>
+          <?php endforeach; ?>
+        </select>
+        <noscript><button type="submit" class="btn secondary" style="width:auto; padding:6px 14px;">Go</button></noscript>
+      </form>
+    </div>
+
     <div class="video-grid">
 
       <?php foreach ($videos as $video): ?>
@@ -158,10 +159,17 @@ function creatorLabel(array $creators, string $name): string
           <div class="tile-title"><?= htmlspecialchars($video['title'], ENT_QUOTES) ?></div>
           <div class="tile-creator"><?= creatorLabel($creators, $video['creator']) ?></div>
           <div class="tile-stats">
-            <?= (int) $video['views'] ?> views • <?= htmlspecialchars(implode(', ', $video['categories']), ENT_QUOTES) ?>
+            <?= formatLength((int) $video['length_seconds']) ?> • <?= (int) $video['views'] ?> views<?php
+              if (!empty($video['categories'])): ?> • <?= htmlspecialchars(implode(', ', $video['categories']), ENT_QUOTES) ?><?php endif; ?>
           </div>
         </a>
       <?php endforeach; ?>
+
+      <?php if ($videos === []): ?>
+        <p class="hint">
+          <?= $query->isFiltered() ? 'No videos match these filters.' : 'No videos yet — upload one to get started.' ?>
+        </p>
+      <?php endif; ?>
 
     </div>
   </main>
@@ -182,10 +190,12 @@ function creatorLabel(array $creators, string $name): string
     uploadToggle.setAttribute('aria-expanded', String(isOpen));
   });
 
+  const maxMinutes = <?= VideoQuery::MAX_LENGTH_MINUTES ?>;
   document.querySelectorAll('.filter-panel input[type="range"]').forEach((input) => {
     const output = document.getElementById(input.id + '-out');
     const isAge = input.id.startsWith('age');
-    const format = (v) => isAge ? v : `${v}m`;
+    // The top of the length slider is an open end, not a hard ceiling.
+    const format = (v) => isAge ? v : (Number(v) >= maxMinutes ? 'any' : `${v}m`);
     output.textContent = format(input.value);
     input.addEventListener('input', () => {
       output.textContent = format(input.value);

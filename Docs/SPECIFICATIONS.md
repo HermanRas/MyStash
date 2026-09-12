@@ -23,6 +23,8 @@
 
 **Creating a stash:** a user is nothing more than a datastore directory plus an index archive encrypted with their password — there is no account record and no stored password. Registration (`register.php`) takes a username, a password and a confirmation, then creates `App/Data/{user}/videos/{user}.json.enc` holding an empty video list, a `default` creator and a `Not Converted` category (both of which ingestion relies on). Usernames are **letters and digits only**, at most 32 characters, and must be unused. That rule is also what makes a username safe to use directly as a path segment — no separators or dots, so it cannot escape the data directory. The same validation guards login.
 
+**Password rules:** at least **24 characters**. Because the password is the encryption key, it is never stored, can never be reset, and cannot be rate-limited where it matters — anyone holding a copy of the `.7z` files can attack them offline as fast as their hardware allows. Length is therefore the only real defence. The minimum is enforced at registration and on password change; it is deliberately *not* enforced at login, so stashes created before the rule still open.
+
 Because the password *is* the encryption key and is never stored, a forgotten password means the stash cannot be recovered — by the user or anyone else.
 
 1. User submits a **username** and **password**. Neither is stored anywhere by the app.
@@ -51,6 +53,20 @@ Because the password *is* the encryption key and is never stored, a forgotten pa
    - Encrypted metadata
 4. All generated artifacts are encrypted and written to the datastore (§3).
 
+**Derived tags — quality and "not converted".** Neither is editable. They describe the file, so letting a user type them in would only let them lie about it; both are recalculated from the stored technical facts (pixel height, container, codec) on ingest, on **every video save**, and on conversion. Conversion measures the converted file while it is still decrypted in tmpfs, which is the one moment the real height is cheap to read.
+
+Quality follows the standard tiers, keyed on vertical pixel count (`p` = progressive). A video takes the highest tier its height reaches; below 360p it is simply `SD`, and an unknown height gets no badge at all:
+
+| Height | Badge | Class |
+| --- | --- | --- |
+| 4320 | `8K` | UHD — 8K UHD, 7680 × 4320 |
+| 2160 | `4K` | UHD — 4K UHD, 3840 × 2160 |
+| 1440 | `2K` | UHD — 2K / QHD, 2560 × 1440 |
+| 1080 | `Full HD` | HD — the standard for streaming and Blu-ray, 1920 × 1080 |
+| 720 | `HD` | HD — "Ready HD", the minimum for high definition, 1280 × 720 |
+| 480 | `480p` | SD — legacy |
+| 360 | `360p` | SD — legacy |
+
 ### 2.4 Conversion
 
 - User-triggered: convert any video to MP4 (H.265/HEVC).
@@ -58,37 +74,53 @@ Because the password *is* the encryption key and is never stored, a forgotten pa
 
 ### 2.5 Edit / Delete
 
-- **Video edit:** available from the video watch page; edits title, description, category tags, timestamped tags, etc.
-- **Creator edit:** available from the user dropdown in the nav bar ("manage creators").
-- **Delete:** removes a video (and its datastore files) or a Creator.
+- **Video edit:** available from the video watch page; edits title, description, creator and category assignments. Quality and "not converted" are not editable — see §2.3.
+- **Creator edit:** available from the user dropdown in the nav bar ("manage creators"); edits name, age, gender, bio, verified flag and profile picture. Renaming a creator repoints every video that referenced the old name; the creator's ID and files stay put.
+- **Delete:** removes a video (and its datastore files), or a Creator (and their record + profile picture, reassigning their videos to `default`).
 
 ### 2.6 Password Change
 
-1. User provides current password + new password (entered twice for confirmation).
-2. App re-encrypts the entire datastore with the new password.
-3. Order of operations: reprocess all video files first, then update `{user}.json.enc` last.
-4. While reprocessing, the previous encrypted file is kept as `Video{ID}/{ID}.mp4.enc.old` until the run completes successfully, then removed.
+1. User provides current password + new password (entered twice for confirmation); the new password must meet the §2.1 minimum length.
+2. App re-encrypts the entire datastore with the new password — **every** archive, not just the videos: the four files per video, each creator's record and profile picture, and the index.
+3. Order of operations: reprocess everything else first, then update `{user}.json.enc` last. While the index still opens with the old password, an interrupted run is retryable.
+4. While reprocessing, the previous encrypted file is kept alongside as `{name}.enc.old` until the run completes successfully, then removed. A failed re-encrypt restores that one archive from its `.old` and aborts before touching anything further.
+
+The re-encryption pass exists as `App/bin/rekey_user.php {user} {old} {new}`; the in-app form is still to come.
 
 ### 2.7 Categories
 
 Categories work like creators: they are **global definitions** (name + colour) managed once per user, and videos *reference* them.
 
-- **Definitions** live in the index (`{user}.json`) as `{"<name>": "<hex colour>"}` and are managed on the Creators screen.
+- **Definitions** live in the index (`{user}.json`) as `{"<name>": "<hex colour>"}` and are managed on the Categories screen.
 - **Assignments** live in the video's own metadata (`Video{ID}/{ID}.json`) as `{"name": "<category>", "timestamp_seconds": N}`.
 - Each assignment carries a timestamp (`hh:mm:ss`, default `00:00:00`) so a category can point at a specific moment; clicking it on the watch page seeks the player there.
 - The **same category may be assigned multiple times** at different timestamps. Only the exact same category at the exact same timestamp is rejected as a duplicate.
 - On the video edit screen you pick a category from the global list — categories can't be invented ad hoc per video.
 - Removing a global category only **retires the definition**: it can no longer be assigned to videos and it disappears from the wall's filter panel, but videos already tagged with it **keep their tags** (they render in a neutral grey, since there's no colour to look up).
 - The wall's filter list is populated from the global definitions.
-- Categories are managed on their own screen (`category.php`), reached from the user dropdown in the nav bar — the same place as "Manage Creators".
+- Categories are managed on their own screen (`category.php`), reached from the user dropdown in the nav bar — the same place as "Manage Creators" — and from the `Categories` pill in the top nav.
+- Clicking a category on that screen opens the wall filtered to it (`wall.php?category[]=<name>`), which is the same URL the filter panel produces.
 
 The index also keeps a **de-duplicated copy of each video's category names** on its entry. That copy is derived, not authoritative: it exists so the wall grid and its filters can render without decrypting every video's metadata archive on each page load.
 
 ### 2.8 Search / Filter / Sort
 
 - **Search:** videos by title, creator, category tags.
-- **Filter:** creators by age, gender, other details.
-- **Sort:** videos by name, length, date.
+- **Filter:** videos by category and length range; creators by age, gender, other details.
+- **Sort:** videos by title, length, views or upload date.
+
+**Sort options** (the wall's sort menu, right of the result count):
+
+| Sort | Order |
+| --- | --- |
+| Uploaded | new → old *(default)*, old → new |
+| Title | A → Z, Z → A |
+| Length | short → long, long → short |
+| Views | min → max, max → min |
+
+Filtering and sorting are applied **server-side**, against the already-decrypted index, and carried in the query string (`?category[]=…&len_min=…&len_max=…&sort=…`). That means a filtered wall renders exactly the tiles it should rather than hiding rows in the browser, the two compose with each other, and any filter can be linked to — which is how clicking a category on the Categories screen opens a filtered wall. `All Videos` in the top nav links to the bare wall URL, so it doubles as the reset. See `App/src/VideoQuery.php`.
+
+The top of the length slider is an **open end**, not a ceiling: at maximum it reads "any" and stops filtering on length.
 
 ## 3. Datastore Layout
 
@@ -97,15 +129,19 @@ All data is stored locally per-user; the app stores nothing server-side outside 
 The datastore root in this repo is `App/Data/` (gitignored — see [../README.md](../README.md) Repository Layout), so paths below are relative to that:
 
 ```
-App/Data/{user}/videos/{user}.json.enc                       # encrypted video index (7z, password-locked)
-App/Data/{user}/videos/Video{ID}/{ID}.mp4.enc                 # encrypted video file
-App/Data/{user}/videos/Video{ID}/{ID}.mp4.preview.enc         # encrypted short preview clip
-App/Data/{user}/videos/Video{ID}/{ID}.jpg.preview.enc         # encrypted preview thumbnail
-App/Data/{user}/videos/Video{ID}/{ID}.json.enc                # encrypted per-video metadata
-App/Data/{user}/videos/Video{ID}/{ID}.mp4.enc.old             # transient safety copy during re-encryption only
+App/Data/{user}/videos/{user}.json.enc                         # encrypted video index (7z, password-locked)
+App/Data/{user}/videos/Video{ID}/{ID}.mp4.enc                  # encrypted video file
+App/Data/{user}/videos/Video{ID}/{ID}.mp4.preview.enc          # encrypted short preview clip
+App/Data/{user}/videos/Video{ID}/{ID}.jpg.preview.enc          # encrypted preview thumbnail
+App/Data/{user}/videos/Video{ID}/{ID}.json.enc                 # encrypted per-video metadata
+App/Data/{user}/creators/Creator{ID}/{ID}.json.enc             # encrypted creator record
+App/Data/{user}/creators/Creator{ID}/{ID}.profile.png.enc      # encrypted creator profile picture
+App/Data/{user}/**/*.enc.old                                   # transient safety copy during re-encryption only
 ```
 
-**Current state:** `App/Data/TestUser/videos/1.mp4` remains as a raw (unencrypted) sample fixture used to exercise the ffmpeg/7z pipeline directly (Phase 0 smoke test) and as upload input for manual testing — it is not itself part of the datastore layout. `App/bin/seed_testuser.php` seeds `TestUser.json.enc` plus a `{ID}.json.enc` per demo entry (password `testpass123`); it **merges**, so re-running it refreshes the demo rows without touching real uploads. Demo entries carry metadata only — no media files — so playback/conversion for them reports "no encrypted video file". Uploads through `App/public/upload.php` create complete `Video{ID}/...enc` entries following the layout above.
+**Creators** are stored the same way videos are. The creator record (`{ID}.json`: id, name, age, gender, bio, verified, created/updated timestamps) is authoritative; the index keeps a denormalized summary of each so the wall, the creator grid and the filter panel can render without decrypting every creator archive on each page load — the same arrangement as the category names on video entries. Creators are still keyed by **display name** in the index, because that is what a video's `creator` field references; the ID only addresses the files, and survives a rename. Uploaded profile pictures are normalised to PNG before encryption, so the stored filename always describes the actual bytes.
+
+**Current state:** `App/Data/TestUser/videos/1.mp4` remains as a raw (unencrypted) sample fixture used to exercise the ffmpeg/7z pipeline directly (Phase 0 smoke test) and as upload input for manual testing — it is not itself part of the datastore layout. `App/bin/seed_testuser.php` seeds `TestUser.json.enc`, a `{ID}.json.enc` per demo entry and a `{ID}.json.enc` per demo creator (password `DS89HONPtufGDncNUoGfshCg` — 24 characters, per §2.1); it **merges**, so re-running it refreshes the demo rows without touching real uploads. Demo entries carry metadata only — no media files — so playback/conversion for them reports "no encrypted video file". Uploads through `App/public/upload.php` create complete `Video{ID}/...enc` entries following the layout above.
 
 ## 4. UI/UX & Layout Specification
 
@@ -124,9 +160,11 @@ High-contrast dark theme, optimized for media consumption.
 
 ```
 +-----------------------------------------------------------------------+
-|  LOGO  |  [ Search Bar... ]  (Categories)  |  [Filters] [User Profile]|
+|  LOGO  |  [ Search Bar... ]       |  [+ Upload] [Filters] [User Profile]|
 +-----------------------------------------------------------------------+
-| (All)  [Most Recent]  [Not Converted]  [Creators]  [Category A] ...    |
+| (All Videos)  [Creators]  [Categories]                                 |
++-----------------------------------------------------------------------+
+| FILTERS  |  7 of 7 videos                              Sort [ ______ ] |
 +-----------------------------------------------------------------------+
 |                                                                       |
 |  +--------------+  +--------------+  +--------------+  +--------------+  |
@@ -135,13 +173,19 @@ High-contrast dark theme, optimized for media consumption.
 |  +--------------+  +--------------+  +--------------+  +--------------+  |
 |  | Title Text   |  | Title Text   |  | Title Text   |  | Title Text   |  |
 |  | Creator Name |  | Creator Name |  | Creator Name |  | Creator Name |  |
-|  | Views • Rating  | Views • Rating  | Views • Rating  | Views • Rating  |
+|  | Length•Views•Cats| Length•Views•Cats| Length•Views•Cats| Length•Views•Cats|
 |  +--------------+  +--------------+  +--------------+  +--------------+  |
 |                                                                       |
 +-----------------------------------------------------------------------+
 ```
 
-**Header & Navigation:** Sticky, dark. Brand mark left, search bar (with auto-complete) center, user actions right. A horizontally scrolling category pill bar sits directly beneath (Most Recent, Not Converted, Creators, then the global category names). There are deliberately no ranking pills such as "Trending" or "Top Rated" — this is a personal wall with no ratings (see §2.8).
+**Header & Navigation:** Sticky, dark. Brand mark left, search bar (with auto-complete) center, user actions right. A pill bar sits directly beneath with exactly three destinations, identical on every page: **All Videos**, **Creators**, **Categories** (`App/views/header.php`).
+
+The nav deliberately carries **no category names** — those live in the wall's left filter panel, and having both was two ways to do the same thing. It carries no "Most Recent" either: that is a sort order, and it belongs in the sort menu. There are likewise no ranking pills such as "Trending" or "Top Rated" — this is a personal wall with no ratings (see §2.8). `All Videos` points at the bare wall URL, so it also resets whatever filters are applied.
+
+**Wall toolbar:** above the grid — the result count on the left (`2 of 7 videos (filtered)`), the sort menu on the right.
+
+**Filter panel:** left side, **open by default**, collapsed by the Filters button. Category checkboxes, a length range, and creator age/gender; Apply submits, Reset returns the bare wall.
 
 **Media Grid:** CSS Grid, `repeat(auto-fill, minmax(280px, 1fr))`. Gap 12–16px. Container padding 16–24px.
 
@@ -153,7 +197,7 @@ High-contrast dark theme, optimized for media consumption.
 | --- | --- | --- |
 | Thumbnail Box | Top | 16:9 (`aspect-ratio: 16/9`), 4px rounded corners, overflow hidden |
 | Duration Badge | Bottom-right overlay | `rgba(0,0,0,0.8)` bg, white text, 11px, e.g. `14:20` |
-| Quality Badge | Bottom-left overlay | Small amber rounded tag, e.g. `4K`, `HD` |
+| Quality Badge | Bottom-left overlay | Small amber rounded tag, e.g. `4K`, `Full HD`, `480p` — derived from pixel height, see §2.3 |
 | Title | Below thumbnail | 14px, line-height 1.3, bold white, 2-line clamp + ellipsis |
 | Creator/Channel | Under title | 12px, `#888888`, inline verified badge if applicable |
 | Stats Line | Bottom row | 12px, `#888888`. Shows length, view count and categories, e.g. `14:20 • 128 views • Personal, Highlights`. No rating or score — there are no likes/ratings anywhere in the app |

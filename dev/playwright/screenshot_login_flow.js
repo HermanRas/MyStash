@@ -15,7 +15,7 @@ const BASE = process.env.BASE_URL || 'http://app:8080';
   console.log('captured login_error.png');
 
   await page.fill('#username', 'TestUser');
-  await page.fill('#password', 'testpass123');
+  await page.fill('#password', process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg');
   await page.click('button[type="submit"]');
   await page.waitForSelector('.video-grid');
   await page.screenshot({ path: '/work/screenshots/wall_live.png', fullPage: true });

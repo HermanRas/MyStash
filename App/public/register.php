@@ -25,8 +25,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Username must be letters and numbers only — no spaces or symbols.';
     } elseif ($users->exists($username)) {
         $error = 'That username is already taken.';
-    } elseif ($password === '') {
-        $error = 'Password cannot be empty.';
+    } elseif (!User::isValidPassword($password)) {
+        $error = sprintf(
+            'Password must be at least %d characters — it is the encryption key for your whole stash, and it can never be reset.',
+            User::MIN_PASSWORD_LENGTH,
+        );
     } elseif ($password !== $confirm) {
         $error = 'The passwords do not match.';
     } elseif (!$users->create($username, $password)) {
@@ -73,12 +76,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                title="Letters and numbers only">
       </div>
       <div class="field">
-        <label for="password">Password</label>
-        <input type="password" id="password" name="password" autocomplete="new-password" required>
+        <label for="password">Password (at least <?= User::MIN_PASSWORD_LENGTH ?> characters)</label>
+        <input type="password" id="password" name="password" autocomplete="new-password"
+               minlength="<?= User::MIN_PASSWORD_LENGTH ?>" required>
       </div>
       <div class="field">
         <label for="confirm-password">Confirm password</label>
-        <input type="password" id="confirm-password" name="confirm_password" autocomplete="new-password" required>
+        <input type="password" id="confirm-password" name="confirm_password" autocomplete="new-password"
+               minlength="<?= User::MIN_PASSWORD_LENGTH ?>" required>
       </div>
       <button type="submit" class="btn">Create Stash</button>
     </form>

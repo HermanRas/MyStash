@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../src/Session.php';
 require_once __DIR__ . '/../src/VideoCategories.php';
+require_once __DIR__ . '/../src/VideoQuality.php';
 
 use MyStash\Datastore;
 use MyStash\Session;
+use MyStash\VideoQuality;
 
 Session::requireLogin();
 
@@ -28,10 +30,18 @@ foreach ($index['videos'] as &$video) {
         $video['description'] = trim((string) ($_POST['description'] ?? ''));
         $video['creator'] = (string) ($_POST['creator'] ?? $video['creator']);
 
+        // Quality and "Not Converted" describe the file, not the user's
+        // opinion of it: they are recalculated here on every save and are
+        // never accepted from the form.
+        $video = VideoQuality::apply($video);
+
         $fields = [
             'title' => $video['title'],
             'description' => $video['description'],
             'creator' => $video['creator'],
+            'height' => $video['height'] ?? null,
+            'quality' => $video['quality'],
+            'not_converted' => $video['not_converted'],
         ];
         break;
     }

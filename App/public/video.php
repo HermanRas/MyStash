@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../src/Session.php';
 require_once __DIR__ . '/../src/VideoCategories.php';
+require_once __DIR__ . '/../src/CreatorStore.php';
 
+use MyStash\CreatorStore;
 use MyStash\Session;
 use MyStash\VideoCategories;
 
@@ -33,10 +35,19 @@ if ($video === null) {
 $editing = isset($_GET['edit']);
 $assignments = (new VideoCategories())->load(Session::user(), Session::password(), $id);
 
+$creatorId = (string) ($creators[$video['creator']]['id'] ?? '');
+$creatorAvatar = CreatorStore::hasProfileImage(Session::user(), $creatorId)
+    ? 'media.php?type=avatar&creator=' . urlencode($creatorId)
+    : null;
+
 function formatLength(int $seconds): string
 {
-    return sprintf('%02d:%02d', intdiv($seconds, 60), $seconds % 60);
+    return $seconds >= 3600
+        ? sprintf('%d:%02d:%02d', intdiv($seconds, 3600), intdiv($seconds % 3600, 60), $seconds % 60)
+        : sprintf('%02d:%02d', intdiv($seconds, 60), $seconds % 60);
 }
+
+$navActive = 'videos';
 ?>
 <!doctype html>
 <html lang="en">
@@ -48,29 +59,7 @@ function formatLength(int $seconds): string
 </head>
 <body>
 
-<header class="site-header">
-  <a class="brand" href="wall.php">
-    <img src="assets/img/icon.png" alt="MyStash">
-    MyStash
-  </a>
-  <div class="search-bar">
-    <input type="text" placeholder="Search videos, creators, categories…">
-  </div>
-  <div class="header-actions">
-    <div class="user-menu" tabindex="0">
-      <div class="user-menu-trigger">
-        <div class="avatar"></div>
-        <?= htmlspecialchars(Session::user(), ENT_QUOTES) ?>
-      </div>
-      <div class="user-menu-dropdown">
-        <a href="creator.php">Manage Creators</a>
-        <a href="category.php">Manage Categories</a>
-        <a href="user.html">Profile &amp; Password</a>
-        <a href="logout.php">Log Out</a>
-      </div>
-    </div>
-  </div>
-</header>
+<?php require __DIR__ . '/../views/header.php'; ?>
 
 <main class="watch-layout">
   <div>
@@ -179,7 +168,7 @@ function formatLength(int $seconds): string
           <button type="submit" class="btn" style="width:auto; padding:8px 20px;">Add</button>
         </form>
         <p class="hint" style="margin-top:12px;">
-          Categories come from the global list (Manage Creators → Categories). The same
+          Categories come from the global list (user menu → Manage Categories). The same
           category can be added more than once at different times.
         </p>
       </div>
@@ -194,7 +183,11 @@ function formatLength(int $seconds): string
   <aside>
     <div class="section-title">Creator</div>
     <div class="card" style="display:flex; align-items:center; gap:12px;">
-      <div class="creator-avatar" style="width:56px; height:56px; margin:0;"></div>
+      <div class="creator-avatar" style="width:56px; height:56px; margin:0;">
+        <?php if ($creatorAvatar !== null): ?>
+          <img src="<?= htmlspecialchars($creatorAvatar, ENT_QUOTES) ?>" alt="">
+        <?php endif; ?>
+      </div>
       <div>
         <div class="creator-name"><?= htmlspecialchars($video['creator'], ENT_QUOTES) ?></div>
         <div class="creator-meta"><?= htmlspecialchars($creators[$video['creator']]['bio'] ?? '', ENT_QUOTES) ?: 'no bio set' ?></div>

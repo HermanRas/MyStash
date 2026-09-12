@@ -9,7 +9,7 @@ const ID = process.env.VIDEO_ID || '9';
 
   await page.goto(`${BASE}/login.html`, { waitUntil: 'networkidle' });
   await page.fill('#username', 'TestUser');
-  await page.fill('#password', 'testpass123');
+  await page.fill('#password', process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg');
   await page.click('button[type="submit"]');
   await page.waitForSelector('.video-grid');
   await page.waitForTimeout(500);

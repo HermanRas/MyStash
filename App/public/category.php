@@ -16,6 +16,14 @@ function categoryUsage(array $videos, string $name): int
 {
     return count(array_filter($videos, static fn($v) => in_array($name, $v['categories'] ?? [], true)));
 }
+
+/** The wall, filtered to one category — what clicking a category opens. */
+function wallLink(string $name): string
+{
+    return 'wall.php?' . http_build_query(['category' => [$name]]);
+}
+
+$navActive = 'categories';
 ?>
 <!doctype html>
 <html lang="en">
@@ -27,35 +35,7 @@ function categoryUsage(array $videos, string $name): int
 </head>
 <body>
 
-<header class="site-header">
-  <a class="brand" href="wall.php">
-    <img src="assets/img/icon.png" alt="MyStash">
-    MyStash
-  </a>
-  <div class="search-bar">
-    <input type="text" placeholder="Search videos, creators, categories…">
-  </div>
-  <div class="header-actions">
-    <div class="user-menu" tabindex="0">
-      <div class="user-menu-trigger">
-        <div class="avatar"></div>
-        <?= htmlspecialchars(Session::user(), ENT_QUOTES) ?>
-      </div>
-      <div class="user-menu-dropdown">
-        <a href="creator.php">Manage Creators</a>
-        <a href="category.php">Manage Categories</a>
-        <a href="user.html">Profile &amp; Password</a>
-        <a href="logout.php">Log Out</a>
-      </div>
-    </div>
-  </div>
-</header>
-
-<nav class="category-bar">
-  <a class="pill" href="wall.php">All Videos</a>
-  <a class="pill" href="creator.php">Creators</a>
-  <span class="pill active">Categories</span>
-</nav>
+<?php require __DIR__ . '/../views/header.php'; ?>
 
 <h1 class="page-title">Categories</h1>
 
@@ -63,7 +43,8 @@ function categoryUsage(array $videos, string $name): int
   <div class="card" style="max-width:560px;">
     <p class="hint" style="margin-top:0;">
       Categories are global: defined once here, then assigned to videos (with a
-      timestamp) from a video's edit screen. They also populate the wall's filter panel.
+      timestamp) from a video's edit screen. They also populate the wall's filter
+      panel — click one below to open the wall filtered to it.
     </p>
 
     <?php if ($categories === []): ?>
@@ -74,10 +55,10 @@ function categoryUsage(array $videos, string $name): int
       <?php foreach ($categories as $name => $color): ?>
         <tr style="border-bottom:1px solid var(--border);">
           <td style="padding:10px 0;">
-            <span class="tag" style="margin:0;">
+            <a class="tag" style="margin:0; text-decoration:none;" href="<?= htmlspecialchars(wallLink($name), ENT_QUOTES) ?>">
               <span class="dot" style="background:<?= htmlspecialchars($color, ENT_QUOTES) ?>"></span>
               <?= htmlspecialchars($name, ENT_QUOTES) ?>
-            </span>
+            </a>
           </td>
           <td style="padding:10px 0; font-size:12px; color:var(--text-muted);">
             on <?= categoryUsage($videos, $name) ?> video<?= categoryUsage($videos, $name) === 1 ? '' : 's' ?>

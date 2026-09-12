@@ -66,35 +66,39 @@ All verified end-to-end via curl (edit/rename/delete/convert/tag add-delete/cate
 - [x] 4.7 Category chips on the watch page seek the player to their timestamp.
 - [x] 4.8 Fixed: the user dropdown closed when the pointer crossed the gap below the trigger — the gap is now a transparent top border on the menu, so it stays within the hover target.
 - [x] 4.9 Fixed: a deleted video could reappear on the wall. Delete was correct; the cause was that every write saved the session's login-time copy of the whole index, so a second session could revert the first's changes. All pages/endpoints now re-read the index from disk first (`Session::refreshIndex()`), and the migration prunes index entries left with no media behind them.
-- [ ] 4.10 Creator avatar image: upload/replace a picture per creator, encrypted in the datastore and served through `media.php`. The UI spec (§4.2, §4.3) calls for circular avatars and the idea lists "Creator upload", but creators currently have no image field — every tile renders an empty gradient circle.
+- [x] 4.10 Creator avatar image: upload/replace a picture per creator, encrypted as `Creator{ID}/{ID}.profile.png.enc` and served through `media.php?type=avatar&creator={ID}`. Whatever is uploaded is normalised to PNG (ffmpeg, capped at 512px) so the stored filename describes the actual bytes. Circular avatars now render on the creator grid, the edit form and the watch page's creator card.
 - [ ] 4.11 Creator view count — the idea asks for "video **and** Creator view count". Creator tiles show a video count today; the view count (sum of their videos' views) is not tracked or shown.
-- [ ] 4.12 Show **length** in the tile's text line under the thumbnail (idea: "title, length, Creator and categories"). Length currently appears only as the duration badge overlaying the thumbnail.
+- [x] 4.12 The tile's stats line now leads with length — `14:20 • 128 views • Personal, Highlights` — as well as the duration badge over the thumbnail. Lengths over an hour render as `h:mm:ss`.
 - [x] 4.13 Global categories moved to their own screen (`App/public/category.php`), reached from the user dropdown instead of being buried at the bottom of the Creators page. Shows how many videos use each category, allows recolouring, and removal now only retires the definition — videos keep tags they already have (SPECIFICATIONS.md §2.7).
 - [x] 4.14 Fixed: the wall's and profile page's "Manage Creators" menu item still pointed at `creator.html`, which stopped existing when it was renamed to `creator.php` — so that menu item was dead.
 - [x] 4.15 The wall's filter panel is now open by default; the Filters button collapses it.
+- [x] 4.16 **Creator records**: creators now have an ID and their own encrypted files (`{user}/creators/Creator{ID}/{ID}.json.enc` + `{ID}.profile.png.enc`), mirroring the video layout — `App/src/CreatorStore.php`. The index keeps a denormalized summary (id, name, age, gender, verified) so the wall and its filters render without decrypting every creator archive; the per-creator file is authoritative. `App/bin/migrate_records.php` backfills IDs and record files for existing stashes.
+- [x] 4.17 Top nav reduced to three pills — **All Videos** (which is also the filter reset), **Creators**, **Categories** — identical on every page (`App/views/header.php`). Category names left the nav entirely: they duplicated the left filter panel. "Most Recent" left too — it is a sort order, not a category, and the migration drops its stale definition.
+- [x] 4.18 Quality and "Not Converted" are **derived, never editable** — `App/src/VideoQuality.php`. Quality comes from the video's pixel height on the standard ladder (8K / 4K / 2K / Full HD / HD / 480p / 360p), "Not Converted" from container + codec. Both are recalculated on ingest, on every video save, and on conversion (which measures the converted file while it is still decrypted in tmpfs).
 
 ## Phase 5 — Search, Filter, Sort, Playlists
 
 - [ ] 5.1 Video search by title, creator, category tags — includes wiring the header search input, which appears on every page today but is connected to nothing
 - [ ] 5.2 Creator filter by age, gender, other details
-- [ ] 5.3 Video sort by name, length, date — **needs 5.6 first**: nothing in the index carries a date to sort on
+- [x] 5.3 Video sort: title A→Z / Z→A, length short→long / long→short, views min→max / max→min, uploaded new→old / old→new — a sort menu on the wall toolbar, applied server-side (`App/src/VideoQuery.php`) so it composes with the filters and stays linkable
 - [ ] 5.4 Playlist creation and playback
 - [ ] 5.5 View count tracking (increment on watch, no likes/comments)
-- [ ] 5.6 Add an upload/added date to each index entry. `uploaded_at` exists only in the per-video metadata, which the wall never reads, so "sort by date" has no data behind it.
-- [ ] 5.7 Make the wall's filter panel actually filter (length range, categories). The panel is UI-only right now; 5.2 covers creator filters only.
+- [x] 5.6 `uploaded_at` is now carried on each index entry (written at ingest, backfilled from per-video metadata by `migrate_records.php`), which is what "sort by uploaded" reads. Entries with no date sort oldest rather than jumping to the top.
+- [x] 5.7 The filter panel filters for real: category checkboxes and the length range are applied server-side via the query string, with an Apply button and a Reset that returns the bare wall. Because the filter lives in the URL, clicking a category on the Categories screen opens the wall filtered to it. The creator age/gender controls are still inert — that is 5.2.
 - [ ] 5.8 Creator search — the idea asks for "video **and** Creator search"; only video search is covered by 5.1.
 - [ ] 5.9 Creator sort — the idea asks for "video **and** Creator ... sort"; only video sort is covered by 5.3.
 
 ## Phase 6 — Password Change & Re-encryption
 
 - [ ] 6.1 Password change form validation (current password check via trial extraction, new password entered twice) — also convert `App/public/user.html` to PHP; it is still the static Phase 1 mockup and is the only page not yet wired
-- [ ] 6.2 Re-encryption pass: for each video, decrypt with old password, re-encrypt with new password, keeping `{ID}.mp4.enc.old` until the whole run succeeds. Note this covers **all four** encrypted files per video (`.mp4.enc`, `.mp4.preview.enc`, `.jpg.preview.enc`, `.json.enc`), not just the video — the idea names only `.mp4.enc.old`, but every file is locked with the same password
-- [ ] 6.3 Update `{user}.json.enc` last, only after all video files are successfully re-encrypted
-- [ ] 6.4 Cleanup of `.old` files on success; rollback plan if a step fails mid-run
+- [x] 6.2 Re-encryption pass (CLI — `App/bin/rekey_user.php {user} {old} {new}`; the web form is 6.1): for each video, decrypt with old password, re-encrypt with new password, keeping `{ID}.mp4.enc.old` until the whole run succeeds. Note this covers **all four** encrypted files per video (`.mp4.enc`, `.mp4.preview.enc`, `.jpg.preview.enc`, `.json.enc`), not just the video — the idea names only `.mp4.enc.old`, but every file is locked with the same password
+- [x] 6.3 Update `{user}.json.enc` last, only after every other archive is re-encrypted — while the index still opens with the old password, an interrupted run is retryable. Implemented in `rekey_user.php`; verified by moving the whole `TestUser` stash (11 archives) onto a 24-character password.
+- [x] 6.4 Cleanup of `.old` files on success; a failed re-encrypt restores that archive from its `.old` and aborts before touching anything further. Covers all four files per video plus the creator archives, not just `.mp4.enc`.
 
 ## Phase 7 — Multi-user Support & Hardening
 
 - [x] 7.0 **User creation flow** — `App/public/register.php` + `App/src/User.php`, linked from the login page. Creates `{user}/videos/{user}.json.enc` with an empty video list, a `default` creator and a `Not Converted` category (both required by ingestion), then signs the user straight in. Usernames are letters/digits only, max 32 chars, and must be unused; the same validation now guards `login.php`, which also closes the path-traversal hole in 7.1. Verified: symbols, traversal attempts, duplicates, empty and mismatched passwords all rejected; a new stash logs in isolated and empty.
+- [x] 7.0.1 **Minimum password length: 24 characters**, enforced at registration (`User::MIN_PASSWORD_LENGTH`, checked server-side and hinted with `minlength` in the form). The password is the encryption key, is never stored, and cannot be reset or rate-limited at the archive itself — anyone with a copy of the `.7z` files can attack them offline — so length is the only defence. Login does not enforce the minimum, so stashes created before the rule still open.
 - [ ] 7.1 Confirm full isolation between `App/Data/{user}/` datastores — path traversal via `{user}` is handled (see 7.0); still to check: that one user can't probe another's existence, and that no cross-user paths leak anywhere else
 - [ ] 7.2 Review PHP `exec`/`proc_open` calls for command-injection safety (arguments arrays, not string interpolation)
 - [ ] 7.3 Rate-limit / lockout considerations on login attempts

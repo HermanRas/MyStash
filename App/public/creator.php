@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 require __DIR__ . '/../src/Session.php';
+require __DIR__ . '/../src/CreatorStore.php';
 
+use MyStash\CreatorStore;
 use MyStash\Session;
 
 Session::requireLogin();
@@ -14,12 +16,28 @@ $categories = $index['categories'] ?? [];
 $videos = $index['videos'] ?? [];
 
 $editing = $_GET['edit'] ?? null;
-$editCreator = $editing !== null ? ($creators[$editing] ?? null) : null;
+// Full details come from the creator's own encrypted record; the index copy is
+// only the denormalized summary the grid renders from.
+$editCreator = ($editing !== null && $editing !== '')
+    ? (new CreatorStore())->load(Session::user(), Session::password(), $index, $editing)
+    : null;
 
 function videoCount(array $videos, string $creatorName): int
 {
     return count(array_filter($videos, static fn($v) => $v['creator'] === $creatorName));
 }
+
+function avatarUrl(array $creator): ?string
+{
+    $id = (string) ($creator['id'] ?? '');
+
+    return CreatorStore::hasProfileImage(Session::user(), $id)
+        ? 'media.php?type=avatar&creator=' . urlencode($id)
+        : null;
+}
+
+$navActive = 'creators';
+$headerActions = '<a class="icon-btn" href="creator.php?edit=">+ Add Creator</a>';
 ?>
 <!doctype html>
 <html lang="en">
@@ -31,35 +49,7 @@ function videoCount(array $videos, string $creatorName): int
 </head>
 <body>
 
-<header class="site-header">
-  <a class="brand" href="wall.php">
-    <img src="assets/img/icon.png" alt="MyStash">
-    MyStash
-  </a>
-  <div class="search-bar">
-    <input type="text" placeholder="Search videos, creators, categories…">
-  </div>
-  <div class="header-actions">
-    <a class="icon-btn" href="creator.php?edit=">+ Add Creator</a>
-    <div class="user-menu" tabindex="0">
-      <div class="user-menu-trigger">
-        <div class="avatar"></div>
-        <?= htmlspecialchars(Session::user(), ENT_QUOTES) ?>
-      </div>
-      <div class="user-menu-dropdown">
-        <a href="creator.php">Manage Creators</a>
-        <a href="category.php">Manage Categories</a>
-        <a href="user.html">Profile &amp; Password</a>
-        <a href="logout.php">Log Out</a>
-      </div>
-    </div>
-  </div>
-</header>
-
-<nav class="category-bar">
-  <a class="pill" href="wall.php">All Videos</a>
-  <span class="pill active">Creators</span>
-</nav>
+<?php require __DIR__ . '/../views/header.php'; ?>
 
 <h1 class="page-title">Creators</h1>
 
@@ -67,7 +57,12 @@ function videoCount(array $videos, string $creatorName): int
   <div class="creator-grid">
     <?php foreach ($creators as $name => $creator): ?>
       <a class="creator-card" href="creator.php?edit=<?= urlencode($name) ?>">
-        <div class="creator-avatar"></div>
+        <?php $avatar = avatarUrl($creator); ?>
+        <div class="creator-avatar">
+          <?php if ($avatar !== null): ?>
+            <img src="<?= htmlspecialchars($avatar, ENT_QUOTES) ?>" alt="">
+          <?php endif; ?>
+        </div>
         <div class="creator-name">
           <?= htmlspecialchars($name, ENT_QUOTES) ?>
           <?php if (!empty($creator['verified'])): ?><span class="verified">✓</span><?php endif; ?>
@@ -83,7 +78,7 @@ function videoCount(array $videos, string $creatorName): int
   <?php if ($editing !== null): ?>
     <div class="section-title"><?= $editCreator ? 'Edit Creator' : 'Add Creator' ?></div>
     <div class="card" style="max-width:480px;">
-      <form action="creator_save.php" method="post">
+      <form action="creator_save.php" method="post" enctype="multipart/form-data">
         <input type="hidden" name="original_name" value="<?= htmlspecialchars($editing, ENT_QUOTES) ?>">
         <div class="field">
           <label for="c-name">Display name</label>
@@ -103,6 +98,17 @@ function videoCount(array $videos, string $creatorName): int
         </div>
         <div class="field">
           <label><input type="checkbox" name="verified" <?= !empty($editCreator['verified']) ? 'checked' : '' ?>> Verified</label>
+        </div>
+        <div class="field">
+          <label for="c-profile">Profile picture</label>
+          <?php $editAvatar = $editCreator !== null ? avatarUrl($editCreator) : null; ?>
+          <?php if ($editAvatar !== null): ?>
+            <div class="creator-avatar" style="width:72px; height:72px; margin:0 0 8px;">
+              <img src="<?= htmlspecialchars($editAvatar, ENT_QUOTES) ?>" alt="">
+            </div>
+          <?php endif; ?>
+          <input type="file" id="c-profile" name="profile" accept="image/*">
+          <p class="hint" style="margin:6px 0 0;">Stored encrypted alongside the creator's record. Leave empty to keep the current picture.</p>
         </div>
         <button type="submit" class="btn" style="width:auto; padding:8px 20px;">Save Changes</button>
       </form>

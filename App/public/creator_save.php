@@ -5,7 +5,9 @@ declare(strict_types=1);
 require __DIR__ . '/../src/Crypto7z.php';
 require __DIR__ . '/../src/Datastore.php';
 require __DIR__ . '/../src/Session.php';
+require __DIR__ . '/../src/CreatorStore.php';
 
+use MyStash\CreatorStore;
 use MyStash\Datastore;
 use MyStash\Session;
 
@@ -25,30 +27,20 @@ if ($name === '') {
 }
 
 $index = Session::refreshIndex();
-$creators = $index['creators'] ?? [];
+$creators = new CreatorStore();
 
-$record = [
+$record = $creators->save(Session::user(), Session::password(), $index, [
     'name' => $name,
-    'age' => $_POST['age'] !== '' ? (int) $_POST['age'] : null,
+    'age' => ($_POST['age'] ?? '') !== '' ? (int) $_POST['age'] : null,
     'gender' => trim((string) ($_POST['gender'] ?? '')) ?: null,
     'bio' => trim((string) ($_POST['bio'] ?? '')),
     'verified' => isset($_POST['verified']),
-];
+], $originalName);
 
-// Renaming: move the key and repoint every video that referenced the old name.
-if ($originalName !== '' && $originalName !== $name) {
-    unset($creators[$originalName]);
-
-    foreach ($index['videos'] as &$video) {
-        if ($video['creator'] === $originalName) {
-            $video['creator'] = $name;
-        }
-    }
-    unset($video);
+// An empty file input means "keep the current picture", not "remove it".
+if (($_FILES['profile']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+    $creators->saveProfileImage(Session::user(), Session::password(), $record['id'], $_FILES['profile']['tmp_name']);
 }
-
-$creators[$name] = $record;
-$index['creators'] = $creators;
 
 Session::setIndex($index);
 (new Datastore())->saveIndex(Session::user(), Session::password(), $index);

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MyStash;
 
+require_once __DIR__ . '/VideoQuality.php';
+
 /**
  * Upload/ingestion pipeline (Docs/PLAN.md Phase 3, Docs/SPECIFICATIONS.md §2.3):
  * format-checks the upload, generates a preview image + silent preview clip,
@@ -47,7 +49,7 @@ final class VideoIngest
             }
 
             $codec = $this->encoder->videoCodec($originalPath);
-            $notConverted = !($ext === 'mp4' && $codec === 'hevc');
+            $notConverted = VideoQuality::isNotConverted($ext, $codec);
 
             $duration = $this->encoder->durationSeconds($originalPath) ?? 0.0;
             $previewAt = $previewTimestamp ?? min(15.0, max(0.0, $duration - 0.5));
@@ -60,13 +62,10 @@ final class VideoIngest
             $previewClipPath = "{$workDir}/preview.mp4";
             $this->encoder->buildPreviewClip($originalPath, $previewClipPath);
 
+            // Both derived tags come from the file itself and are never
+            // user-editable — see VideoQuality.
             $height = $this->encoder->videoHeight($originalPath);
-            $quality = match (true) {
-                $height === null => null,
-                $height >= 2160 => '4K',
-                $height >= 720 => 'HD',
-                default => null,
-            };
+            $quality = VideoQuality::tagForHeight($height);
 
             // Category assignments reference a global category by name and
             // carry the timestamp they point at (see VideoCategories).
@@ -82,6 +81,8 @@ final class VideoIngest
                 'views' => 0,
                 'format' => $ext,
                 'codec' => $codec,
+                'height' => $height,
+                'quality' => $quality,
                 'not_converted' => $notConverted,
                 'uploaded_at' => date('c'),
                 'categories' => $assignments,
@@ -107,7 +108,9 @@ final class VideoIngest
                 'views' => 0,
                 'format' => $ext,
                 'codec' => $codec,
+                'height' => $height,
                 'not_converted' => $notConverted,
+                'uploaded_at' => $metadata['uploaded_at'],
                 'categories' => $categories,
                 'quality' => $quality,
                 'tile_gradient' => $this->randomTileGradient(),
