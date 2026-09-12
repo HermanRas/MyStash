@@ -47,8 +47,10 @@ const PASSWORD = process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg';
   const credited = await page.locator('input[name="creators[]"]:checked')
     .evaluateAll((els) => els.map((el) => el.value));
   const added = credited.filter((name) => !original.includes(name));
-  await page.click('button[type="submit"]:has-text("Save Changes")');
-  await page.waitForSelector('.watch-title');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'networkidle' }),
+    page.click('button[type="submit"]:has-text("Save Changes")'),
+  ]);
 
   // Count once — reading the locator twice (label and condition) can catch the
   // page mid-render and report two different numbers.
@@ -89,8 +91,10 @@ const PASSWORD = process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg';
   for (const box of await page.locator('input[name="creators[]"]').all()) {
     await box.setChecked(original.includes(await box.inputValue()));
   }
-  await page.click('button[type="submit"]:has-text("Save Changes")');
-  await page.waitForSelector('.watch-title');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'networkidle' }),
+    page.click('button[type="submit"]:has-text("Save Changes")'),
+  ]);
   check(`the original credits are restored (${original.join(', ')})`,
     (await page.locator('.creator-strip .creator-name').allInnerTexts())
       .map((t) => t.trim()).sort().join(',') === [...original].sort().join(','));

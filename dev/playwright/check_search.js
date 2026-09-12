@@ -24,12 +24,12 @@ const PASSWORD = process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg';
   // The box has to be a real form, or typing into it does nothing.
   check('the search box is a form that targets the wall',
     (await page.getAttribute('.search-bar', 'action') || '').includes('wall.php'));
-  check('the input is named q', await page.getAttribute('.search-bar input', 'name') === 'q');
+  check('the input is named q', await page.getAttribute('.search-bar input[name="q"]', 'name') === 'q');
 
   // Search for a word from the first video's title.
   const word = all[0].split(/\s+/).find((w) => w.length > 3) || all[0];
-  await page.fill('.search-bar input', word);
-  await page.press('.search-bar input', 'Enter');
+  await page.fill('.search-bar input[name="q"]', word);
+  await page.press('.search-bar input[name="q"]', 'Enter');
   await page.waitForLoadState('networkidle');
 
   const hits = await titles();
@@ -37,18 +37,28 @@ const PASSWORD = process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg';
   check(`searching a title word finds that video ("${word}")`, hits.includes(all[0]));
   check('the search reaches the URL', page.url().includes('q='));
   check('the box still shows the term after the results load',
-    await page.inputValue('.search-bar input') === word);
+    await page.inputValue('.search-bar input[name="q"]') === word);
   check('the count line names the term',
     (await page.locator('.wall-count').innerText()).includes(word));
   await page.screenshot({ path: '/work/screenshots/search_hit.png' });
 
-  // Searching from another page should land on the wall.
-  await page.goto(`${BASE}/creator.php`, { waitUntil: 'networkidle' });
-  await page.fill('.search-bar input', word);
-  await page.press('.search-bar input', 'Enter');
-  await page.waitForLoadState('networkidle');
-  check('searching from the Creators page lands on the wall',
+  // Searching from another page should land on the wall. The Creators screen
+  // is the deliberate exception — there the same box searches creators in
+  // place, which check_creator_search.js covers.
+  await page.goto(`${BASE}/category.php`, { waitUntil: 'networkidle' });
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'networkidle' }),
+    (async () => {
+      await page.fill('.search-bar input[name="q"]', word);
+      await page.press('.search-bar input[name="q"]', 'Enter');
+    })(),
+  ]);
+  check('searching from the Categories page lands on the wall',
     page.url().includes('wall.php') && page.url().includes('q='));
+
+  await page.goto(`${BASE}/creator.php`, { waitUntil: 'networkidle' });
+  check('on the Creators page the one box searches creators instead',
+    (await page.getAttribute('.search-bar', 'action') || '').includes('creator.php'));
 
   // A creator name should find their videos.
   const creator = await page.$$eval('.tile-creator', (els) => els.map((e) => e.innerText.trim()));
@@ -93,14 +103,14 @@ const PASSWORD = process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg';
   await page.selectOption('#sort', 'title_asc');
   await page.waitForLoadState('networkidle');
   check('changing the sort keeps the search',
-    page.url().includes('q=') && await page.inputValue('.search-bar input') === word);
+    page.url().includes('q=') && await page.inputValue('.search-bar input[name="q"]') === word);
 
   const box = page.locator('.filter-panel input[type="checkbox"]').first();
   if (await box.count()) {
     await box.check();
     await page.waitForLoadState('networkidle');
     check('ticking a filter keeps the search',
-      page.url().includes('q=') && await page.inputValue('.search-bar input') === word);
+      page.url().includes('q=') && await page.inputValue('.search-bar input[name="q"]') === word);
   }
 
   await browser.close();

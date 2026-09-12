@@ -7,7 +7,9 @@ require __DIR__ . '/../src/VideoEncoder.php';
 require __DIR__ . '/../src/VideoQuality.php';
 require __DIR__ . '/../src/User.php';
 require __DIR__ . '/../src/VideoQuery.php';
+require __DIR__ . '/../src/CreatorQuery.php';
 
+use MyStash\CreatorQuery;
 use MyStash\Crypto7z;
 use MyStash\User;
 use MyStash\VideoEncoder;
@@ -209,5 +211,80 @@ step(
         'id',
     ) === ['9'],
 );
+
+// Creator search and sort (Docs/PLAN.md 5.8, 5.9) — again pure logic.
+$people = [
+    'default' => ['id' => '1', 'bio' => 'booping'],
+    'Alex R.' => ['id' => '2', 'bio' => 'skate filmer', 'age' => 31, 'gender' => 'Non-binary'],
+    'Jamie K.' => ['id' => '3', 'bio' => '', 'age' => 24, 'gender' => 'Female'],
+    'Morgan P.' => ['id' => '4', 'bio' => 'drone pilot', 'gender' => 'Male'],
+];
+
+// default is on both videos, Alex on one, Jamie on one, Morgan on none.
+$clips = [
+    ['id' => '1', 'creators' => ['default', 'Alex R.']],
+    ['id' => '2', 'creators' => ['default', 'Jamie K.']],
+];
+
+$creatorSearch = static fn(string $term): array => array_keys(
+    CreatorQuery::fromRequest(['q' => $term])->apply($people, $clips),
+);
+
+step('creator search matches a name', $creatorSearch('jamie') === ['Jamie K.']);
+step('creator search matches a bio', $creatorSearch('drone') === ['Morgan P.']);
+step('creator search matches a gender', $creatorSearch('female') === ['Jamie K.']);
+step('creator search is case-insensitive', $creatorSearch('ALEX') === ['Alex R.']);
+step('creator search matches a partial word', $creatorSearch('skat') === ['Alex R.']);
+step('creator search returns nothing when nothing matches', $creatorSearch('zzz') === []);
+step('an empty creator search returns everyone', count($creatorSearch('')) === 4);
+step(
+    'every creator term must match ("skate filmer" vs "skate drone")',
+    $creatorSearch('skate filmer') === ['Alex R.'] && $creatorSearch('skate drone') === [],
+);
+
+$creatorSort = static fn(string $sort): array => array_keys(
+    CreatorQuery::fromRequest(['sort' => $sort])->apply($people, $clips),
+);
+
+step(
+    'creators sort by name A→Z by default',
+    $creatorSort('name_asc') === ['Alex R.', 'default', 'Jamie K.', 'Morgan P.'],
+);
+step(
+    'name Z→A is the exact reverse',
+    $creatorSort('name_desc') === array_reverse($creatorSort('name_asc')),
+);
+step(
+    'creators sort by video count, max→min',
+    $creatorSort('videos_desc') === ['default', 'Alex R.', 'Jamie K.', 'Morgan P.'],
+);
+step(
+    'creators sort by video count, min→max',
+    $creatorSort('videos_asc') === ['Morgan P.', 'Alex R.', 'Jamie K.', 'default'],
+);
+step(
+    'creators sort by age, young→old, with unknown ages last',
+    $creatorSort('age_asc') === ['Jamie K.', 'Alex R.', 'default', 'Morgan P.'],
+);
+step(
+    'creators sort by age, old→young, with unknown ages still last',
+    $creatorSort('age_desc') === ['Alex R.', 'Jamie K.', 'default', 'Morgan P.'],
+);
+
+// "o" matches default (bio "booping"), Alex (gender "Non-binary") and Morgan
+// (name), but not Jamie — so this checks the sort really is applied to a
+// filtered set rather than to everyone.
+step(
+    'creator search and sort compose',
+    array_keys(CreatorQuery::fromRequest(['q' => 'o', 'sort' => 'videos_desc'])->apply($people, $clips))
+        === ['default', 'Alex R.', 'Morgan P.'],
+);
+
+step('an unknown creator sort falls back to the default',
+    CreatorQuery::fromRequest(['sort' => 'nonsense'])->sort === CreatorQuery::DEFAULT_SORT);
+step('an array q is ignored on the creator search',
+    CreatorQuery::fromRequest(['q' => ['x']])->search === '');
+step('a creator search counts as filtered',
+    CreatorQuery::fromRequest(['q' => 'x'])->isFiltered() && !CreatorQuery::fromRequest([])->isFiltered());
 
 echo PHP_EOL . "All smoke tests passed." . PHP_EOL;

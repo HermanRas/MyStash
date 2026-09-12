@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../src/Session.php';
 require_once __DIR__ . '/../src/CreatorStore.php';
+require_once __DIR__ . '/../src/CreatorQuery.php';
 require_once __DIR__ . '/../src/VideoCreators.php';
 
+use MyStash\CreatorQuery;
 use MyStash\CreatorStore;
 use MyStash\Session;
 use MyStash\VideoCreators;
@@ -13,9 +15,13 @@ use MyStash\VideoCreators;
 Session::requireLogin();
 
 $index = Session::refreshIndex();
-$creators = $index['creators'] ?? [];
+$allCreators = $index['creators'] ?? [];
 $categories = $index['categories'] ?? [];
 $videos = $index['videos'] ?? [];
+
+$query = CreatorQuery::fromRequest($_GET);
+$creators = $query->apply($allCreators, $videos);
+$totalCreators = count($allCreators);
 
 $editing = $_GET['edit'] ?? null;
 // Full details come from the creator's own encrypted record; the index copy is
@@ -38,6 +44,28 @@ function avatarUrl(array $creator): ?string
         : null;
 }
 
+// A→Z / Z→A for the name sort, 0→9 / 9→0 for the numeric ones — same mapping
+// the wall's sort menu uses.
+// Opening a creator shouldn't throw away the search or sort you got there with.
+$keepQuery = http_build_query(array_filter([
+    'q' => $query->search,
+    'sort' => $query->sort === CreatorQuery::DEFAULT_SORT ? '' : $query->sort,
+]));
+
+$sortIcon = match ($query->sort) {
+    'name_asc' => 'sort-az',
+    'name_desc' => 'sort-za',
+    default => str_ends_with($query->sort, '_asc') ? 'sort-09' : 'sort-90',
+};
+
+// The site's one search box points at this page while you are on it, so it
+// finds a creator rather than videos. It keeps the chosen sort.
+$searchTerm = $query->search;
+$searchAction = 'creator.php';
+$searchPlaceholder = 'Search creators by name, bio or gender…';
+$searchClearHref = 'creator.php' . ($query->sort === CreatorQuery::DEFAULT_SORT ? '' : '?sort=' . urlencode($query->sort));
+$searchHidden = ['sort' => $query->sort];
+
 $navActive = 'creators';
 $headerActions = '<a class="icon-btn" href="creator.php?edit="><img class="btn-icon" src="assets/img/icons/creator.png" alt="">Add Creator</a>';
 ?>
@@ -56,9 +84,31 @@ $headerActions = '<a class="icon-btn" href="creator.php?edit="><img class="btn-i
 <h1 class="page-title">Creators</h1>
 
 <main class="container">
+  <?php /* Sort lives here (5.9); the search (5.8) is the site's single box up
+           in the header, pointed at this page. */ ?>
+  <div class="wall-toolbar">
+    <span class="wall-count">
+      <?= count($creators) ?> of <?= $totalCreators ?> creator<?= $totalCreators === 1 ? '' : 's' ?>
+      <?php if ($query->search !== ''): ?>
+        matching <strong class="wall-term"><?= htmlspecialchars($query->search, ENT_QUOTES) ?></strong>
+      <?php endif; ?>
+    </span>
+
+    <form method="get" action="creator.php" class="sort-form">
+      <input type="hidden" name="q" value="<?= htmlspecialchars($query->search, ENT_QUOTES) ?>">
+      <label for="sort"><img class="btn-icon" src="assets/img/icons/<?= $sortIcon ?>.png" alt="">Sort</label>
+      <select id="sort" name="sort" onchange="this.form.submit()">
+        <?php foreach (CreatorQuery::SORTS as $value => $label): ?>
+          <option value="<?= $value ?>" <?= $value === $query->sort ? 'selected' : '' ?>><?= $label ?></option>
+        <?php endforeach; ?>
+      </select>
+      <noscript><button type="submit" class="btn secondary small">Go</button></noscript>
+    </form>
+  </div>
+
   <div class="creator-grid">
     <?php foreach ($creators as $name => $creator): ?>
-      <a class="creator-card" href="creator.php?edit=<?= urlencode($name) ?>">
+      <a class="creator-card" href="creator.php?edit=<?= urlencode($name) ?><?= $keepQuery !== '' ? '&amp;' . $keepQuery : '' ?>">
         <?php $avatar = avatarUrl($creator); ?>
         <div class="creator-avatar">
           <?php if ($avatar !== null): ?>
@@ -75,6 +125,13 @@ $headerActions = '<a class="icon-btn" href="creator.php?edit="><img class="btn-i
       </a>
     <?php endforeach; ?>
   </div>
+
+  <?php if ($creators === [] && $query->search !== ''): ?>
+    <p class="hint">
+      No creator matches <strong class="wall-term"><?= htmlspecialchars($query->search, ENT_QUOTES) ?></strong>.
+      <a href="creator.php" style="color:var(--accent);">Show every creator</a>
+    </p>
+  <?php endif; ?>
 
   <?php if ($editing !== null): ?>
     <div class="section-title"><?= $editCreator ? 'Edit Creator' : 'Add Creator' ?></div>

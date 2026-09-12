@@ -138,7 +138,7 @@ $navActive = 'videos';
       </p>
     <?php else: ?>
       <div class="section-title" style="margin-top:20px;">Edit Video</div>
-      <div class="card" style="max-width:560px;">
+      <div class="card">
         <form action="video_save.php" method="post">
           <input type="hidden" name="id" value="<?= htmlspecialchars($id, ENT_QUOTES) ?>">
           <div class="field">
@@ -170,7 +170,7 @@ $navActive = 'videos';
       </div>
 
       <div class="section-title">Categories</div>
-      <div class="card" style="max-width:560px;">
+      <div class="card">
         <?php if ($assignments === []): ?>
           <p class="hint" style="margin:0 0 12px;">No categories assigned yet.</p>
         <?php endif; ?>

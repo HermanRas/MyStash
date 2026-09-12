@@ -7,8 +7,14 @@ declare(strict_types=1);
  *
  * Callers set $navActive to 'videos', 'creators' or 'categories' before
  * including this, and may set $headerActions to extra HTML for the right-hand
- * button group. The wall sets $searchTerm so the box still shows what was
- * searched for after the results load.
+ * button group.
+ *
+ * There is exactly one search box on the site, and it is this one. It searches
+ * whatever the page you are on is a list of: videos everywhere (landing on the
+ * wall), creators while you are on the Creators screen. A page steers it by
+ * setting $searchTerm (so the box still shows what was searched for after the
+ * results load), and optionally $searchAction, $searchPlaceholder,
+ * $searchClearHref and $searchHidden.
  *
  * The nav carries exactly three pills. Category names deliberately do NOT
  * appear here: they live in the wall's left filter panel, and having both was
@@ -26,6 +32,11 @@ use MyStash\VideoQuery;
 $navActive = $navActive ?? '';
 $headerActions = $headerActions ?? '';
 $searchTerm = $searchTerm ?? '';
+$searchAction = $searchAction ?? 'wall.php';
+$searchPlaceholder = $searchPlaceholder ?? 'Search videos, creators, categories…';
+$searchClearHref = $searchClearHref ?? $searchAction;
+// Extra state the search must not throw away (the Creators screen's sort).
+$searchHidden = $searchHidden ?? [];
 
 // Icons are sliced from the generated sheet in Docs/Assets/site_icons.png.
 $navPills = [
@@ -40,17 +51,21 @@ $navPills = [
     MyStash
   </a>
 
-  <?php /* Searching always lands on the wall, from whichever page you were on.
-           It deliberately carries no filters with it: the header box searches
-           the whole stash, and narrowing down afterwards is what the filter
-           panel is for (which does carry the search term through). */ ?>
-  <form class="search-bar" method="get" action="wall.php" role="search">
+  <?php /* The site's one search box. On the Creators screen it searches
+           creators in place; everywhere else it searches videos and lands on
+           the wall, carrying no filters with it — narrowing down afterwards is
+           what the filter panel is for (which does carry the term through). */ ?>
+  <form class="search-bar" method="get" action="<?= htmlspecialchars($searchAction, ENT_QUOTES) ?>" role="search">
+    <?php foreach ($searchHidden as $name => $value): ?>
+      <input type="hidden" name="<?= htmlspecialchars((string) $name, ENT_QUOTES) ?>"
+             value="<?= htmlspecialchars((string) $value, ENT_QUOTES) ?>">
+    <?php endforeach; ?>
     <input type="text" name="q" aria-label="Search"
            maxlength="<?= VideoQuery::MAX_SEARCH_LENGTH ?>"
            value="<?= htmlspecialchars($searchTerm, ENT_QUOTES) ?>"
-           placeholder="Search videos, creators, categories…">
+           placeholder="<?= htmlspecialchars($searchPlaceholder, ENT_QUOTES) ?>">
     <?php if ($searchTerm !== ''): ?>
-      <a class="search-clear" href="wall.php" aria-label="Clear search">&times;</a>
+      <a class="search-clear" href="<?= htmlspecialchars($searchClearHref, ENT_QUOTES) ?>" aria-label="Clear search">&times;</a>
     <?php endif; ?>
   </form>
 
