@@ -1,3 +1,30 @@
+<?php
+
+declare(strict_types=1);
+
+require __DIR__ . '/../src/Session.php';
+
+use MyStash\Session;
+
+Session::requireLogin();
+
+$index = Session::index();
+$videos = $index['videos'] ?? [];
+$categories = $index['categories'] ?? [];
+$creators = $index['creators'] ?? [];
+
+function formatLength(int $seconds): string
+{
+    return sprintf('%02d:%02d', intdiv($seconds, 60), $seconds % 60);
+}
+
+function creatorLabel(array $creators, string $name): string
+{
+    $verified = ($creators[$name]['verified'] ?? false) ? ' ✓' : '';
+
+    return htmlspecialchars($name, ENT_QUOTES) . $verified;
+}
+?>
 <!doctype html>
 <html lang="en">
 <head>
@@ -9,7 +36,7 @@
 <body>
 
 <header class="site-header">
-  <a class="brand" href="wall.html">
+  <a class="brand" href="wall.php">
     <img src="assets/img/icon.png" alt="MyStash">
     MyStash
   </a>
@@ -23,12 +50,12 @@
     <div class="user-menu" tabindex="0">
       <div class="user-menu-trigger">
         <div class="avatar"></div>
-        TestUser
+        <?= htmlspecialchars(Session::user(), ENT_QUOTES) ?>
       </div>
       <div class="user-menu-dropdown">
         <a href="creator.html">Manage Creators</a>
         <a href="user.html">Profile &amp; Password</a>
-        <a href="login.html">Log Out</a>
+        <a href="logout.php">Log Out</a>
       </div>
     </div>
   </div>
@@ -39,8 +66,10 @@
   <span class="pill">Most Recent</span>
   <span class="pill">Not Converted</span>
   <a class="pill" href="creator.html">Creators</a>
-  <span class="pill">Personal</span>
-  <span class="pill">Highlights</span>
+  <?php foreach ($categories as $name => $color): ?>
+    <?php if (in_array($name, ['Most Recent', 'Not Converted'], true)) continue; ?>
+    <span class="pill"><?= htmlspecialchars($name, ENT_QUOTES) ?></span>
+  <?php endforeach; ?>
 </nav>
 
 <div class="layout">
@@ -84,76 +113,24 @@
   <main class="container">
     <div class="video-grid">
 
-      <a class="video-card" href="video.html" style="--tile-a:#3a3a3a; --tile-b:#161616;">
-        <div class="thumb">
-          <div class="thumb-gradient"></div>
-          <span class="badge quality">HD</span>
-          <span class="badge duration">14:20</span>
-          <div class="preview-progress"></div>
-        </div>
-        <div class="tile-title">Evening Session — Full Walkthrough</div>
-        <div class="tile-creator">default ✓</div>
-        <div class="tile-stats">128 views • Personal</div>
-      </a>
-
-      <a class="video-card" href="video.html" style="--tile-a:#4a3a2a; --tile-b:#1a1410;">
-        <div class="thumb">
-          <div class="thumb-gradient"></div>
-          <span class="badge quality">4K</span>
-          <span class="badge duration">05:42</span>
-          <div class="preview-progress"></div>
-        </div>
-        <div class="tile-title">Studio Test Clip 01</div>
-        <div class="tile-creator">Alex R. ✓</div>
-        <div class="tile-stats">34 views • Highlights</div>
-      </a>
-
-      <a class="video-card" href="video.html" style="--tile-a:#2a3a3a; --tile-b:#101a1a;">
-        <div class="thumb">
-          <div class="thumb-gradient"></div>
-          <span class="badge duration">22:05</span>
-          <div class="preview-progress"></div>
-        </div>
-        <div class="tile-title">Behind the Scenes — Raw Footage (Not Converted)</div>
-        <div class="tile-creator">default</div>
-        <div class="tile-stats">9 views • Not Converted</div>
-      </a>
-
-      <a class="video-card" href="video.html" style="--tile-a:#3a2a3a; --tile-b:#1a101a;">
-        <div class="thumb">
-          <div class="thumb-gradient"></div>
-          <span class="badge quality">HD</span>
-          <span class="badge duration">08:11</span>
-          <div class="preview-progress"></div>
-        </div>
-        <div class="tile-title">Quick Recap Reel</div>
-        <div class="tile-creator">Jamie K. ✓</div>
-        <div class="tile-stats">210 views • Highlights</div>
-      </a>
-
-      <a class="video-card" href="video.html" style="--tile-a:#3a3a2a; --tile-b:#181810;">
-        <div class="thumb">
-          <div class="thumb-gradient"></div>
-          <span class="badge quality">HD</span>
-          <span class="badge duration">31:47</span>
-          <div class="preview-progress"></div>
-        </div>
-        <div class="tile-title">Long-Form Interview Draft</div>
-        <div class="tile-creator">default</div>
-        <div class="tile-stats">17 views • Most Recent</div>
-      </a>
-
-      <a class="video-card" href="video.html" style="--tile-a:#2a2a3a; --tile-b:#10101a;">
-        <div class="thumb">
-          <div class="thumb-gradient"></div>
-          <span class="badge quality">HD</span>
-          <span class="badge duration">02:58</span>
-          <div class="preview-progress"></div>
-        </div>
-        <div class="tile-title">Preview Clip Sample</div>
-        <div class="tile-creator">Alex R. ✓</div>
-        <div class="tile-stats">5 views • Personal</div>
-      </a>
+      <?php foreach ($videos as $video): ?>
+        <a class="video-card" href="video.html?id=<?= urlencode($video['id']) ?>"
+           style="--tile-a:<?= htmlspecialchars($video['tile_gradient'][0] ?? '#333', ENT_QUOTES) ?>; --tile-b:<?= htmlspecialchars($video['tile_gradient'][1] ?? '#161616', ENT_QUOTES) ?>;">
+          <div class="thumb">
+            <div class="thumb-gradient"></div>
+            <?php if (!empty($video['quality'])): ?>
+              <span class="badge quality"><?= htmlspecialchars($video['quality'], ENT_QUOTES) ?></span>
+            <?php endif; ?>
+            <span class="badge duration"><?= formatLength((int) $video['length_seconds']) ?></span>
+            <div class="preview-progress"></div>
+          </div>
+          <div class="tile-title"><?= htmlspecialchars($video['title'], ENT_QUOTES) ?></div>
+          <div class="tile-creator"><?= creatorLabel($creators, $video['creator']) ?></div>
+          <div class="tile-stats">
+            <?= (int) $video['views'] ?> views • <?= htmlspecialchars(implode(', ', $video['categories']), ENT_QUOTES) ?>
+          </div>
+        </a>
+      <?php endforeach; ?>
 
     </div>
   </main>

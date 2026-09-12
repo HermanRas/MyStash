@@ -28,11 +28,11 @@ Verified by serving `App/public/` via `docker compose up` and screenshotting all
 
 ## Phase 2 — Datastore & Login
 
-- [ ] 2.1 Define `{user}.json.enc` schema (video index: ID, title, category tags incl. timestamped ones, creator ref, length, view count, format, conversion status)
-- [ ] 2.2 Define per-video `{ID}.json.enc` metadata schema
-- [ ] 2.3 Login endpoint: check `./{user}` path exists, attempt `{user}.json.enc` extraction with submitted password (Phase 0.6), return session on success
-- [ ] 2.4 Session handling: password held only in memory for the session (never persisted), used to decrypt/re-encrypt on demand
-- [ ] 2.5 Wire `wall.html` to real decrypted index data for the logged-in user
+- [x] 2.1 Define `{user}.json.enc` schema (video index: ID, title, category tags incl. timestamped ones, creator ref, length, view count, format, conversion status) — `App/src/Datastore.php` docblock; seeded via `App/bin/seed_testuser.php`
+- [x] 2.2 Define per-video `{ID}.json.enc` metadata schema — documented in `App/src/Datastore.php` docblock; files themselves are created during Phase 3 ingestion, not yet on disk
+- [x] 2.3 Login endpoint: check `./{user}` path exists, attempt `{user}.json.enc` extraction with submitted password (Phase 0.6), return session on success — `App/public/login.php` + `App/src/Datastore::loadIndex()`
+- [x] 2.4 Session handling: password held only in memory for the session (never persisted), used to decrypt/re-encrypt on demand — `App/src/Session.php`, backed by tmpfs (`/dev/shm`) rather than the default on-disk session store, so the password never touches persistent disk
+- [x] 2.5 Wire `wall.html` to real decrypted index data for the logged-in user — renamed to `App/public/wall.php`, renders `Session::index()` server-side; verified end-to-end (wrong password rejected, correct password decrypts + renders, unauthenticated access redirected, logout clears session) with curl and a disposable Playwright container
 
 ## Phase 3 — Upload & Ingestion Pipeline
 

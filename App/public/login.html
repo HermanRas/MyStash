@@ -14,7 +14,9 @@
       MyStash
     </div>
 
-    <form action="#" method="post">
+    <p class="hint" id="login-error" hidden style="color:#ff6b6b;">Incorrect username or password.</p>
+
+    <form action="login.php" method="post">
       <div class="field">
         <label for="username">Username</label>
         <input type="text" id="username" name="username" autocomplete="username" required>
@@ -29,5 +31,10 @@
     <p class="hint">Your password is never stored — it's the key that decrypts your stash. Wrong password or unknown username look identical: access denied.</p>
   </div>
 </div>
+<script>
+  if (new URLSearchParams(location.search).has('error')) {
+    document.getElementById('login-error').hidden = false;
+  }
+</script>
 </body>
 </html>

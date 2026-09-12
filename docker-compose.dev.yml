@@ -6,4 +6,5 @@ services:
     working_dir: /work
     volumes:
       - ./dev/playwright:/work
+      - ./dev/playwright/.pwlib:/opt/pwlib
     entrypoint: ["tail", "-f", "/dev/null"]

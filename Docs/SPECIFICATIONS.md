@@ -27,6 +27,8 @@
 4. Success = login. Failure (bad path or bad password) = rejected, no further detail given.
 5. Once logged in, the app reads the decrypted video index from `{user}.json.enc` and renders the video wall.
 
+**Session storage:** the password (and the decrypted index, kept for the session so it isn't re-decrypted on every request) live in a PHP session — but the session store itself is redirected to tmpfs (`/dev/shm`, RAM-backed) instead of PHP's default on-disk session path, so the password never touches persistent disk. It's gone on logout or container restart. See `App/src/Session.php`.
+
 ### 2.2 Video Wall Load
 
 1. Preview images and video metadata load first, from the decrypted datastore index.
