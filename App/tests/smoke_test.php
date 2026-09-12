@@ -82,9 +82,11 @@ step(
 // Derived tags (Docs/SPECIFICATIONS.md §2.3) — pure logic, no ffmpeg needed.
 $qualityCases = [
     [4320, '8K'], [2160, '4K'], [1440, '2K'], [1080, 'Full HD'],
-    [720, 'HD'], [480, '480p'], [360, '360p'],
-    // Between tiers a video takes the lower one; below every tier it is just SD.
-    [1439, 'Full HD'], [719, '480p'], [240, 'SD'], [null, null],
+    [720, 'HD'],
+    // 360p and 480p are both just standard definition — no per-height badge.
+    [480, 'SD'], [360, 'SD'], [240, 'SD'],
+    // Between tiers a video takes the lower one.
+    [1439, 'Full HD'], [719, 'SD'], [null, null],
 ];
 
 foreach ($qualityCases as [$height, $expected]) {

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MyStash;
 
+require_once __DIR__ . '/VideoCreators.php';
+
 /**
  * The wall's filter + sort state, read from the query string and applied to
  * the index's video list (Docs/SPECIFICATIONS.md §2.8).
@@ -36,9 +38,11 @@ final class VideoQuery
 
     /**
      * @param list<string> $categories
+     * @param list<string> $creators
      */
     private function __construct(
         public readonly array $categories,
+        public readonly array $creators,
         public readonly int $minMinutes,
         public readonly int $maxMinutes,
         public readonly string $sort,
@@ -47,10 +51,13 @@ final class VideoQuery
 
     public static function fromRequest(array $query): self
     {
-        $categories = array_values(array_filter(
-            array_map('strval', (array) ($query['category'] ?? [])),
+        $names = static fn(string $key): array => array_values(array_filter(
+            array_map('strval', (array) ($query[$key] ?? [])),
             static fn(string $name) => $name !== '',
         ));
+
+        $categories = $names('category');
+        $creators = $names('creator');
 
         $min = max(0, (int) ($query['len_min'] ?? 0));
         $max = (int) ($query['len_max'] ?? self::MAX_LENGTH_MINUTES);
@@ -61,12 +68,13 @@ final class VideoQuery
             $sort = self::DEFAULT_SORT;
         }
 
-        return new self($categories, $min, $max, $sort);
+        return new self($categories, $creators, $min, $max, $sort);
     }
 
     public function isFiltered(): bool
     {
         return $this->categories !== []
+            || $this->creators !== []
             || $this->minMinutes > 0
             || $this->maxMinutes < self::MAX_LENGTH_MINUTES;
     }
@@ -74,6 +82,11 @@ final class VideoQuery
     public function hasCategory(string $name): bool
     {
         return in_array($name, $this->categories, true);
+    }
+
+    public function hasCreator(string $name): bool
+    {
+        return in_array($name, $this->creators, true);
     }
 
     /**
@@ -91,6 +104,11 @@ final class VideoQuery
 
             // The top of the slider is an open end, not a 180-minute ceiling.
             if ($this->maxMinutes < self::MAX_LENGTH_MINUTES && $minutes > $this->maxMinutes) {
+                return false;
+            }
+
+            if ($this->creators !== []
+                && array_intersect($this->creators, VideoCreators::of($video)) === []) {
                 return false;
             }
 

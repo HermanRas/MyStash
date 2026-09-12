@@ -23,8 +23,9 @@ final class VideoQuality
      *   1440p  2K / QHD    2560 × 1440
      *   1080p  Full HD     1920 × 1080
      *    720p  HD          1280 ×  720   (the minimum for "high definition")
-     *    480p  SD
-     *    360p  SD
+     *
+     * Below 720p there is no separate badge per height: 360p and 480p are both
+     * simply standard definition, so both are tagged `SD`.
      *
      * @var list<array{0: int, 1: string}>
      */
@@ -34,8 +35,7 @@ final class VideoQuality
         [1440, '2K'],
         [1080, 'Full HD'],
         [720, 'HD'],
-        [480, '480p'],
-        [360, '360p'],
+        [0, 'SD'],
     ];
 
     /**
@@ -54,7 +54,6 @@ final class VideoQuality
             }
         }
 
-        // Below every named tier — still standard definition, just smaller.
         return 'SD';
     }
 

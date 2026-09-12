@@ -83,7 +83,7 @@ $navActive = 'videos';
     <?php endif; ?>
 
     <div class="watch-meta">
-      <?= (int) $video['views'] ?> views • <?= formatLength((int) $video['length_seconds']) ?>
+      <span id="view-count"><?= (int) $video['views'] ?></span> views • <?= formatLength((int) $video['length_seconds']) ?>
       <?php if (!empty($video['quality'])): ?> • <?= htmlspecialchars($video['quality'], ENT_QUOTES) ?><?php endif; ?>
       <?php if (!empty($video['not_converted'])): ?>
         • <span style="color:#cc4444;">Not Converted</span>
@@ -217,6 +217,24 @@ $navActive = 'videos';
   // The video file is only fetched/decrypted on click, never eagerly.
   const player = document.getElementById('player');
 
+  // A view is recorded the first time playback starts on this page — not on
+  // page load, so opening a video without watching it doesn't count.
+  let viewRecorded = false;
+
+  function recordView() {
+    if (viewRecorded) return;
+    viewRecorded = true;
+
+    fetch('video_view.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ id: <?= json_encode($id) ?> }),
+    })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => { if (data) document.getElementById('view-count').textContent = data.views; })
+      .catch(() => {});
+  }
+
   function startPlayback(atSeconds) {
     let video = player.querySelector('video');
 
@@ -234,6 +252,9 @@ $navActive = 'videos';
       video.readyState >= 1 ? seek() : video.addEventListener('loadedmetadata', seek, { once: true });
     }
 
+    // Count the view when the browser actually starts playing, so a file that
+    // fails to decode isn't counted as watched.
+    video.addEventListener('playing', recordView, { once: true });
     video.play().catch(() => {});
   }
 

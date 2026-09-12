@@ -57,7 +57,7 @@ Because the password *is* the encryption key and is never stored, a forgotten pa
 
 **Derived tags — quality and "not converted".** Neither is editable. They describe the file, so letting a user type them in would only let them lie about it; both are recalculated from the stored technical facts (pixel height, container, codec) on ingest, on **every video save**, and on conversion. Conversion measures the converted file while it is still decrypted in tmpfs, which is the one moment the real height is cheap to read.
 
-Quality follows the standard tiers, keyed on vertical pixel count (`p` = progressive). A video takes the highest tier its height reaches; below 360p it is simply `SD`, and an unknown height gets no badge at all:
+Quality follows the standard tiers, keyed on vertical pixel count (`p` = progressive). A video takes the highest tier its height reaches. Standard definition gets no per-height badge — 360p and 480p are both just `SD` — and an unknown height gets no badge at all:
 
 | Height | Badge | Class |
 | --- | --- | --- |
@@ -66,8 +66,9 @@ Quality follows the standard tiers, keyed on vertical pixel count (`p` = progres
 | 1440 | `2K` | UHD — 2K / QHD, 2560 × 1440 |
 | 1080 | `Full HD` | HD — the standard for streaming and Blu-ray, 1920 × 1080 |
 | 720 | `HD` | HD — "Ready HD", the minimum for high definition, 1280 × 720 |
-| 480 | `480p` | SD — legacy |
-| 360 | `360p` | SD — legacy |
+| below 720 | `SD` | SD — 360p and 480p, legacy formats for tube TVs and low-bandwidth streaming |
+
+**Views** are counted when playback actually starts (the player's `playing` event), not when the watch page loads — opening a video without watching it does not count, and a file the browser cannot decode is not counted as watched. The count is written to both the per-video metadata and the index entry, so the wall can show it without decrypting anything. There are no likes, ratings or comments anywhere in the app.
 
 ### 2.4 Conversion
 
@@ -108,7 +109,7 @@ The index also keeps a **de-duplicated copy of each video's category names** on 
 ### 2.8 Search / Filter / Sort
 
 - **Search:** videos by title, creator, category tags.
-- **Filter:** videos by category and length range; creators by age, gender, other details.
+- **Filter:** videos by category, creator and length range; creators by age, gender, other details.
 - **Sort:** videos by title, length, views or upload date.
 
 **Sort options** (the wall's sort menu, right of the result count):
@@ -120,7 +121,7 @@ The index also keeps a **de-duplicated copy of each video's category names** on 
 | Length | short → long, long → short |
 | Views | min → max, max → min |
 
-Filtering and sorting are applied **server-side**, against the already-decrypted index, and carried in the query string (`?category[]=…&len_min=…&len_max=…&sort=…`). That means a filtered wall renders exactly the tiles it should rather than hiding rows in the browser, the two compose with each other, and any filter can be linked to — which is how clicking a category on the Categories screen opens a filtered wall. `All Videos` in the top nav links to the bare wall URL, so it doubles as the reset. See `App/src/VideoQuery.php`.
+Filtering and sorting are applied **server-side**, against the already-decrypted index, and carried in the query string (`?category[]=…&creator[]=…&len_min=…&len_max=…&sort=…`). That means a filtered wall renders exactly the tiles it should rather than hiding rows in the browser, the two compose with each other, and any filter can be linked to — which is how clicking a category on the Categories screen opens a filtered wall. `All Videos` in the top nav links to the bare wall URL, so it doubles as the reset. See `App/src/VideoQuery.php`.
 
 The top of the length slider is an **open end**, not a ceiling: at maximum it reads "any" and stops filtering on length.
 
@@ -200,7 +201,7 @@ The nav deliberately carries **no category names** — those live in the wall's 
 
 **Wall toolbar:** above the grid — the result count on the left (`2 of 7 videos (filtered)`), the sort menu on the right.
 
-**Filter panel:** left side, **open by default**, collapsed by the Filters button. Category checkboxes, a length range, and creator age/gender. There is **no Apply button** — the form submits on change (range inputs fire `change` on release, so dragging doesn't reload mid-drag) — and **no Reset button**, because `All Videos` in the top nav is the bare wall URL and already does exactly that.
+**Filter panel:** left side, **open by default**, collapsed by the Filters button. Titled **Filters**, with each group a native `<details>` accordion in the order **Categories → Videos → Creators**. Categories is open on load; a group holding an active filter re-opens too, so a filter is never hidden behind a collapsed heading. Category checkboxes, a length range, creator checkboxes, and creator age/gender. There is **no Apply button** — the form submits on change (range inputs fire `change` on release, so dragging doesn't reload mid-drag) — and **no Reset button**, because `All Videos` in the top nav is the bare wall URL and already does exactly that.
 
 **Media Grid:** CSS Grid, `repeat(auto-fill, minmax(280px, 1fr))`. Gap 12–16px. Container padding 16–24px.
 

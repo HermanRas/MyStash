@@ -294,16 +294,80 @@ a {
   display: none;
 }
 
-.filter-section {
-  margin-bottom: 28px;
+.filter-title {
+  margin: 0 0 18px;
+  font-size: 15px;
+  font-weight: 700;
 }
 
-.filter-section h4 {
-  margin: 0 0 14px;
+/* Each group is a native <details> accordion — no JS, and it keeps working
+   with the form submitting on change. */
+.filter-section {
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+}
+
+.filter-section summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  margin-bottom: 4px;
   font-size: 12px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-muted);
+}
+
+.filter-section summary:hover {
+  color: var(--text);
+}
+
+/* Replace the default triangle with a chevron that flips when open. */
+.filter-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.filter-section summary::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  margin-top: -4px;
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.filter-section[open] summary::after {
+  margin-top: 3px;
+  transform: rotate(-135deg);
+}
+
+/* A checkbox row: box, colour dot, label — all on one line. */
+.check-row {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  font-weight: normal;
+  justify-content: flex-start !important;
+}
+
+.check-row input[type="checkbox"] {
+  accent-color: var(--accent);
+  margin: 0;
+}
+
+.check-row .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
 }
 
 .filter-row {
@@ -531,7 +595,8 @@ select option {
 
 .sort-form select {
   width: auto;
-  padding: 6px 10px;
+  /* Room for the custom arrow, which `width: auto` doesn't account for. */
+  padding: 6px 30px 6px 10px;
   font-size: 12px;
 }
 

@@ -68,11 +68,33 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
 
 <div class="layout">
   <aside class="filter-panel" id="filter-panel">
+    <h2 class="filter-title">Filters</h2>
+
     <form method="get" action="wall.php" id="filter-form">
       <input type="hidden" name="sort" value="<?= htmlspecialchars($query->sort, ENT_QUOTES) ?>">
 
-      <div class="filter-section">
-        <h4>Videos</h4>
+      <?php /* Native <details> accordions — no JS needed. Categories is the
+               one open by default; the others remember nothing between loads
+               beyond whether a filter in them is active. */ ?>
+      <details class="filter-section" open>
+        <summary>Categories</summary>
+        <?php foreach ($categories as $name => $color): ?>
+          <div class="filter-row">
+            <label class="check-row">
+              <input type="checkbox" name="category[]" value="<?= htmlspecialchars($name, ENT_QUOTES) ?>"
+                     <?= $query->hasCategory($name) ? 'checked' : '' ?>>
+              <span class="dot" style="background:<?= htmlspecialchars($color, ENT_QUOTES) ?>"></span>
+              <?= htmlspecialchars($name, ENT_QUOTES) ?>
+            </label>
+          </div>
+        <?php endforeach; ?>
+        <?php if ($categories === []): ?>
+          <p class="hint" style="margin:0;">No categories defined yet.</p>
+        <?php endif; ?>
+      </details>
+
+      <details class="filter-section" <?= $query->minMinutes > 0 || $query->maxMinutes < VideoQuery::MAX_LENGTH_MINUTES ? 'open' : '' ?>>
+        <summary>Videos</summary>
         <div class="filter-row">
           <label>Longer than <output id="len-min-out"><?= $query->minMinutes ?>m</output></label>
           <input type="range" id="len-min" name="len_min" min="0" max="<?= VideoQuery::MAX_LENGTH_MINUTES ?>" step="1" value="<?= $query->minMinutes ?>">
@@ -81,24 +103,20 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
           <label>Shorter than <output id="len-max-out"><?= $query->maxMinutes ?>m</output></label>
           <input type="range" id="len-max" name="len_max" min="0" max="<?= VideoQuery::MAX_LENGTH_MINUTES ?>" step="1" value="<?= $query->maxMinutes ?>">
         </div>
-      </div>
+      </details>
 
-      <div class="filter-section">
-        <h4>Categories</h4>
-        <?php foreach ($categories as $name => $color): ?>
+      <details class="filter-section" <?= $query->creators !== [] ? 'open' : '' ?>>
+        <summary>Creators</summary>
+        <?php foreach (array_keys($creators) as $name): ?>
           <div class="filter-row">
-            <label style="font-weight:normal; justify-content:flex-start; gap:8px;">
-              <input type="checkbox" name="category[]" value="<?= htmlspecialchars($name, ENT_QUOTES) ?>"
-                     <?= $query->hasCategory($name) ? 'checked' : '' ?>>
-              <span class="dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:<?= htmlspecialchars($color, ENT_QUOTES) ?>"></span>
+            <label class="check-row">
+              <input type="checkbox" name="creator[]" value="<?= htmlspecialchars($name, ENT_QUOTES) ?>"
+                     <?= $query->hasCreator($name) ? 'checked' : '' ?>>
               <?= htmlspecialchars($name, ENT_QUOTES) ?>
             </label>
           </div>
         <?php endforeach; ?>
-      </div>
 
-      <div class="filter-section">
-        <h4>Creators</h4>
         <div class="filter-row">
           <label>Age at least <output id="age-min-out">18</output></label>
           <input type="range" id="age-min" min="18" max="80" step="1" value="18">
@@ -116,7 +134,7 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
             <option>Non-binary</option>
           </select>
         </div>
-      </div>
+      </details>
 
       <?php /* No Apply button — the form submits on change (see below). No
                Reset either: "All Videos" in the top nav is the bare wall URL,
@@ -134,6 +152,9 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
       <form method="get" action="wall.php" class="sort-form">
         <?php foreach ($query->categories as $name): ?>
           <input type="hidden" name="category[]" value="<?= htmlspecialchars($name, ENT_QUOTES) ?>">
+        <?php endforeach; ?>
+        <?php foreach ($query->creators as $name): ?>
+          <input type="hidden" name="creator[]" value="<?= htmlspecialchars($name, ENT_QUOTES) ?>">
         <?php endforeach; ?>
         <input type="hidden" name="len_min" value="<?= $query->minMinutes ?>">
         <input type="hidden" name="len_max" value="<?= $query->maxMinutes ?>">
