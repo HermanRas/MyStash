@@ -61,7 +61,6 @@ foreach ($index['creators'] as $name => $creator) {
         'age' => $creator['age'] ?? null,
         'gender' => $creator['gender'] ?? null,
         'bio' => $creator['bio'] ?? '',
-        'verified' => (bool) ($creator['verified'] ?? false),
         'created_at' => $creator['created_at'] ?? date('c'),
     ];
 

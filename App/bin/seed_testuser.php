@@ -31,11 +31,11 @@ $categories = [
     'Not Converted' => '#cc4444',
 ];
 
-// [id, name, age, gender, verified]
+// [id, name, age, gender]
 $sampleCreators = [
-    ['1', 'default', null, null, false],
-    ['2', 'Alex R.', 29, 'Female', true],
-    ['3', 'Jamie K.', 34, 'Male', true],
+    ['1', 'default', null, null],
+    ['2', 'Alex R.', 29, 'Female'],
+    ['3', 'Jamie K.', 34, 'Male'],
 ];
 
 // [id, title, creator, length, views, format, codec, height, gradient,
@@ -70,14 +70,13 @@ $videos = array_values(array_filter(
 ));
 
 $creators = $existing['creators'];
-foreach ($sampleCreators as [$id, $name, $age, $gender, $verified]) {
+foreach ($sampleCreators as [$id, $name, $age, $gender]) {
     $record = [
         'id' => $id,
         'name' => $name,
         'age' => $age,
         'gender' => $gender,
         'bio' => '',
-        'verified' => $verified,
         'created_at' => date('c'),
     ];
 

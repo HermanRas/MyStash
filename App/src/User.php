@@ -73,7 +73,6 @@ final class User
             'age' => null,
             'gender' => null,
             'bio' => '',
-            'verified' => false,
             'created_at' => date('c'),
         ];
 

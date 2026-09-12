@@ -37,7 +37,7 @@ function avatarUrl(array $creator): ?string
 }
 
 $navActive = 'creators';
-$headerActions = '<a class="icon-btn" href="creator.php?edit=">+ Add Creator</a>';
+$headerActions = '<a class="icon-btn" href="creator.php?edit="><img class="btn-icon" src="assets/img/icons/creator.png" alt="">Add Creator</a>';
 ?>
 <!doctype html>
 <html lang="en">
@@ -65,7 +65,6 @@ $headerActions = '<a class="icon-btn" href="creator.php?edit=">+ Add Creator</a>
         </div>
         <div class="creator-name">
           <?= htmlspecialchars($name, ENT_QUOTES) ?>
-          <?php if (!empty($creator['verified'])): ?><span class="verified">✓</span><?php endif; ?>
         </div>
         <div class="creator-meta">
           <?= videoCount($videos, $name) ?> video<?= videoCount($videos, $name) === 1 ? '' : 's' ?>
@@ -78,7 +77,7 @@ $headerActions = '<a class="icon-btn" href="creator.php?edit=">+ Add Creator</a>
   <?php if ($editing !== null): ?>
     <div class="section-title"><?= $editCreator ? 'Edit Creator' : 'Add Creator' ?></div>
     <div class="card" style="max-width:480px;">
-      <form action="creator_save.php" method="post" enctype="multipart/form-data">
+      <form id="creator-form" action="creator_save.php" method="post" enctype="multipart/form-data">
         <input type="hidden" name="original_name" value="<?= htmlspecialchars($editing, ENT_QUOTES) ?>">
         <div class="field">
           <label for="c-name">Display name</label>
@@ -97,9 +96,6 @@ $headerActions = '<a class="icon-btn" href="creator.php?edit=">+ Add Creator</a>
           <input type="text" id="c-bio" name="bio" value="<?= htmlspecialchars($editCreator['bio'] ?? '', ENT_QUOTES) ?>" placeholder="Short bio…">
         </div>
         <div class="field">
-          <label><input type="checkbox" name="verified" <?= !empty($editCreator['verified']) ? 'checked' : '' ?>> Verified</label>
-        </div>
-        <div class="field">
           <label for="c-profile">Profile picture</label>
           <?php $editAvatar = $editCreator !== null ? avatarUrl($editCreator) : null; ?>
           <?php if ($editAvatar !== null): ?>
@@ -110,14 +106,23 @@ $headerActions = '<a class="icon-btn" href="creator.php?edit=">+ Add Creator</a>
           <input type="file" id="c-profile" name="profile" accept="image/*">
           <p class="hint" style="margin:6px 0 0;">Stored encrypted alongside the creator's record. Leave empty to keep the current picture.</p>
         </div>
-        <button type="submit" class="btn" style="width:auto; padding:8px 20px;">Save Changes</button>
       </form>
+
       <?php if ($editCreator && $editing !== 'default'): ?>
-        <form action="creator_delete.php" method="post" style="display:inline;" onsubmit="return confirm('Delete this creator? Their videos will be reassigned to default.');">
+        <form id="creator-delete-form" action="creator_delete.php" method="post"
+              onsubmit="return confirm('Delete this creator? Their videos will be reassigned to default.');">
           <input type="hidden" name="name" value="<?= htmlspecialchars($editing, ENT_QUOTES) ?>">
-          <button type="submit" class="btn secondary" style="width:auto; padding:8px 20px;">Delete Creator</button>
         </form>
       <?php endif; ?>
+
+      <?php /* Both buttons sit outside their forms and target them by id, so
+               they can share one row (forms cannot be nested). */ ?>
+      <div class="form-actions">
+        <button type="submit" form="creator-form" class="btn">Save Changes</button>
+        <?php if ($editCreator && $editing !== 'default'): ?>
+          <button type="submit" form="creator-delete-form" class="btn secondary">Delete Creator</button>
+        <?php endif; ?>
+      </div>
     </div>
   <?php endif; ?>
 

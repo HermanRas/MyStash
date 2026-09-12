@@ -20,15 +20,16 @@ use MyStash\Session;
 $navActive = $navActive ?? '';
 $headerActions = $headerActions ?? '';
 
+// Icons are sliced from the generated sheet in Docs/Assets/site_icons.png.
 $navPills = [
-    'videos' => ['All Videos', 'wall.php'],
-    'creators' => ['Creators', 'creator.php'],
-    'categories' => ['Categories', 'category.php'],
+    'videos' => ['All Videos', 'wall.php', 'videos'],
+    'creators' => ['Creators', 'creator.php', 'creator'],
+    'categories' => ['Categories', 'category.php', 'tag'],
 ];
 ?>
 <header class="site-header">
   <a class="brand" href="wall.php">
-    <img src="assets/img/icon.png" alt="MyStash">
+    <img src="assets/img/mark.png" alt="MyStash">
     MyStash
   </a>
 
@@ -40,21 +41,23 @@ $navPills = [
     <?= $headerActions ?>
     <div class="user-menu" tabindex="0">
       <div class="user-menu-trigger">
-        <div class="avatar"></div>
+        <div class="avatar"><img src="assets/img/icons/user.png" alt=""></div>
         <?= htmlspecialchars(Session::user(), ENT_QUOTES) ?>
       </div>
       <div class="user-menu-dropdown">
-        <a href="creator.php">Manage Creators</a>
-        <a href="category.php">Manage Categories</a>
-        <a href="user.html">Profile &amp; Password</a>
-        <a href="logout.php">Log Out</a>
+        <a href="creator.php"><img class="menu-icon" src="assets/img/icons/creator.png" alt="">Manage Creators</a>
+        <a href="category.php"><img class="menu-icon" src="assets/img/icons/tag.png" alt="">Manage Categories</a>
+        <a href="user.html"><img class="menu-icon" src="assets/img/icons/user.png" alt="">Profile &amp; Password</a>
+        <a href="logout.php"><img class="menu-icon" src="assets/img/icons/logout.png" alt="">Log Out</a>
       </div>
     </div>
   </div>
 </header>
 
 <nav class="category-bar">
-  <?php foreach ($navPills as $key => [$label, $href]): ?>
-    <a class="pill<?= $key === $navActive ? ' active' : '' ?>" href="<?= $href ?>"><?= $label ?></a>
+  <?php foreach ($navPills as $key => [$label, $href, $icon]): ?>
+    <a class="pill<?= $key === $navActive ? ' active' : '' ?>" href="<?= $href ?>">
+      <img class="pill-icon" src="assets/img/icons/<?= $icon ?>.png" alt=""><?= $label ?>
+    </a>
   <?php endforeach; ?>
 </nav>

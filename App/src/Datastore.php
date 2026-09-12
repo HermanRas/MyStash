@@ -16,7 +16,7 @@ require_once __DIR__ . '/Crypto7z.php';
  * Index schema ({user}.json — the global, per-user record):
  * {
  *   "categories": { "<name>": "<hex color>" },   // global category definitions
- *   "creators":   { "<name>": {"id","name","age","gender","bio","verified"} },
+ *   "creators":   { "<name>": {"id","name","age","gender","bio"} },
  *                                                // DENORMALIZED — see CreatorStore
  *   "videos": [
  *     {

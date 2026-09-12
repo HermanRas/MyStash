@@ -92,16 +92,29 @@ final class Session
      * taken at login: the whole index is written back on each change, so a
      * session working from a stale copy would silently revert changes made in
      * another session (which is exactly how a deleted video reappeared on the
-     * wall once). Falls back to the session copy if the archive can't be read.
+     * wall once).
+     *
+     * If the index no longer decrypts, the session's password is stale — the
+     * stash was re-keyed elsewhere while this session was open. The session is
+     * ended rather than allowed to continue: every write re-encrypts with the
+     * password the session holds, so carrying on would rewrite the index and
+     * creator records under the *old* key and leave the stash split across two
+     * passwords, with some archives opening under neither in practice. That is
+     * not hypothetical — it happened once, after `bin/rekey_user.php` ran while
+     * a browser session was still open.
      */
     public static function refreshIndex(): array
     {
         $index = (new Datastore())->loadIndex(self::user(), self::password());
 
-        if ($index !== null) {
-            $_SESSION['index'] = $index;
+        if ($index === null) {
+            self::logout();
+            header('Location: login.html?error=stale');
+            exit;
         }
 
-        return $_SESSION['index'];
+        $_SESSION['index'] = $index;
+
+        return $index;
     }
 }

@@ -34,7 +34,6 @@ $record = $creators->save(Session::user(), Session::password(), $index, [
     'age' => ($_POST['age'] ?? '') !== '' ? (int) $_POST['age'] : null,
     'gender' => trim((string) ($_POST['gender'] ?? '')) ?: null,
     'bio' => trim((string) ($_POST['bio'] ?? '')),
-    'verified' => isset($_POST['verified']),
 ], $originalName);
 
 // An empty file input means "keep the current picture", not "remove it".

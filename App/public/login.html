@@ -10,11 +10,11 @@
 <div class="form-page">
   <div class="form-card">
     <div class="brand">
-      <img src="assets/img/icon.png" alt="MyStash">
-      MyStash
+      <img class="brand-logo" src="assets/img/logo.png" alt="MyStash">
     </div>
 
     <p class="hint" id="login-error" hidden style="color:#ff6b6b;">Incorrect username or password.</p>
+    <p class="hint" id="login-stale" hidden style="color:#ffa31a;">Your session ended: this stash's password was changed elsewhere. Sign in with the new password.</p>
 
     <form action="login.php" method="post">
       <div class="field">
@@ -25,15 +25,18 @@
         <label for="password">Password</label>
         <input type="password" id="password" name="password" autocomplete="current-password" required>
       </div>
-      <button type="submit" class="btn">Unlock Stash</button>
+      <button type="submit" class="btn"><img class="btn-icon" src="assets/img/icons/login.png" alt="">Unlock Stash</button>
     </form>
 
     <p class="hint">Your password is never stored — it's the key that decrypts your stash. Wrong password or unknown username look identical: access denied.</p>
-    <p class="hint"><a href="register.php" style="color:var(--accent);">Create a new stash</a></p>
+    <p class="hint"><a href="register.php" style="color:var(--accent);"><img class="btn-icon" src="assets/img/icons/register.png" alt="">Create a new stash</a></p>
   </div>
 </div>
 <script>
-  if (new URLSearchParams(location.search).has('error')) {
+  const error = new URLSearchParams(location.search).get('error');
+  if (error === 'stale') {
+    document.getElementById('login-stale').hidden = false;
+  } else if (error !== null) {
     document.getElementById('login-error').hidden = false;
   }
 </script>

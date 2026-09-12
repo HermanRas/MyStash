@@ -25,16 +25,18 @@ function formatLength(int $seconds): string
         : sprintf('%02d:%02d', intdiv($seconds, 60), $seconds % 60);
 }
 
-function creatorLabel(array $creators, string $name): string
-{
-    $verified = ($creators[$name]['verified'] ?? false) ? ' ✓' : '';
-
-    return htmlspecialchars($name, ENT_QUOTES) . $verified;
-}
+// A→Z / Z→A for the title sorts, 0→9 / 9→0 for the numeric ones.
+$sortIcon = match ($query->sort) {
+    'title_asc' => 'sort-az',
+    'title_desc' => 'sort-za',
+    default => str_ends_with($query->sort, '_asc') ? 'sort-09' : 'sort-90',
+};
 
 $navActive = 'videos';
-$headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="false" aria-controls="upload-panel">+ Upload</button>'
-    . '<button class="icon-btn" id="filters-toggle" aria-expanded="true" aria-controls="filter-panel">Filters</button>';
+$headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="false" aria-controls="upload-panel">'
+    . '<img class="btn-icon" src="assets/img/icons/upload.png" alt="">Upload</button>'
+    . '<button class="icon-btn" id="filters-toggle" aria-expanded="true" aria-controls="filter-panel">'
+    . '<img class="btn-icon" id="filters-chevron" src="assets/img/icons/chevron-up.png" alt="">Filters</button>';
 ?>
 <!doctype html>
 <html lang="en">
@@ -131,7 +133,7 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
         <?php endforeach; ?>
         <input type="hidden" name="len_min" value="<?= $query->minMinutes ?>">
         <input type="hidden" name="len_max" value="<?= $query->maxMinutes ?>">
-        <label for="sort">Sort</label>
+        <label for="sort"><img class="btn-icon" src="assets/img/icons/<?= $sortIcon ?>.png" alt="">Sort</label>
         <select id="sort" name="sort" onchange="this.form.submit()">
           <?php foreach (VideoQuery::SORTS as $value => $label): ?>
             <option value="<?= $value ?>" <?= $value === $query->sort ? 'selected' : '' ?>><?= $label ?></option>
@@ -157,7 +159,7 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
             <div class="preview-progress"></div>
           </div>
           <div class="tile-title"><?= htmlspecialchars($video['title'], ENT_QUOTES) ?></div>
-          <div class="tile-creator"><?= creatorLabel($creators, $video['creator']) ?></div>
+          <div class="tile-creator"><?= htmlspecialchars($video['creator'], ENT_QUOTES) ?></div>
           <div class="tile-stats">
             <?= formatLength((int) $video['length_seconds']) ?> • <?= (int) $video['views'] ?> views<?php
               if (!empty($video['categories'])): ?> • <?= htmlspecialchars(implode(', ', $video['categories']), ENT_QUOTES) ?><?php endif; ?>
@@ -178,9 +180,11 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
 <script>
   const toggle = document.getElementById('filters-toggle');
   const panel = document.getElementById('filter-panel');
+  const chevron = document.getElementById('filters-chevron');
   toggle.addEventListener('click', () => {
     const isClosed = panel.classList.toggle('closed');
     toggle.setAttribute('aria-expanded', String(!isClosed));
+    chevron.src = `assets/img/icons/chevron-${isClosed ? 'down' : 'up'}.png`;
   });
 
   const uploadToggle = document.getElementById('upload-toggle');

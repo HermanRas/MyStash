@@ -16,7 +16,7 @@ require_once __DIR__ . '/VideoEncoder.php';
  *   App/Data/{user}/creators/Creator{ID}/{ID}.profile.png.enc
  *
  * The index keeps a denormalized copy of each creator (name, age, gender,
- * verified, id) so the wall and its filter panel can render without decrypting
+ * id) so the wall and its filter panel can render without decrypting
  * every creator archive on each page load — exactly the arrangement used for
  * category names. The per-creator file is the source of truth.
  *
@@ -90,7 +90,6 @@ final class CreatorStore
             'age' => $record['age'],
             'gender' => $record['gender'],
             'bio' => $record['bio'],
-            'verified' => $record['verified'],
         ];
 
         $this->datastore->saveCreatorMetadata($user, $password, $id, $record);

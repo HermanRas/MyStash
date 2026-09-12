@@ -59,8 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <div class="form-page">
   <div class="form-card">
     <div class="brand">
-      <img src="assets/img/icon.png" alt="MyStash">
-      MyStash
+      <img class="brand-logo" src="assets/img/logo.png" alt="MyStash">
     </div>
 
     <?php if ($error !== null): ?>
@@ -85,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <input type="password" id="confirm-password" name="confirm_password" autocomplete="new-password"
                minlength="<?= User::MIN_PASSWORD_LENGTH ?>" required>
       </div>
-      <button type="submit" class="btn">Create Stash</button>
+      <button type="submit" class="btn"><img class="btn-icon" src="assets/img/icons/register.png" alt="">Create Stash</button>
     </form>
 
     <p class="hint">
@@ -93,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       saved anywhere, so if you lose it your stash cannot be recovered by anyone,
       including you.
     </p>
-    <p class="hint"><a href="login.html" style="color:var(--accent);">Already have a stash? Log in</a></p>
+    <p class="hint"><a href="login.html" style="color:var(--accent);"><img class="btn-icon" src="assets/img/icons/login.png" alt="">Already have a stash? Log in</a></p>
   </div>
 </div>
 </body>
