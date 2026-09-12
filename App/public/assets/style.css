@@ -174,9 +174,74 @@ a {
   border-color: var(--accent);
 }
 
+/* ---------- Layout with Filter Panel ---------- */
+
+.layout {
+  display: flex;
+  align-items: flex-start;
+}
+
+.filter-panel {
+  flex: 0 0 260px;
+  width: 260px;
+  padding: 20px;
+  border-right: 1px solid var(--border);
+  display: none;
+}
+
+.filter-panel.open {
+  display: block;
+}
+
+.filter-section {
+  margin-bottom: 28px;
+}
+
+.filter-section h4 {
+  margin: 0 0 14px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.filter-row {
+  margin-bottom: 16px;
+}
+
+.filter-row label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.filter-row output {
+  color: var(--accent);
+  font-family: monospace;
+}
+
+.filter-row input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.filter-row select {
+  width: 100%;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
 /* ---------- Media Grid ---------- */
 
 .container {
+  flex: 1;
+  min-width: 0;
   padding: 20px 24px;
 }
 
