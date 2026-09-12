@@ -79,7 +79,7 @@ $navPills = [
       <div class="user-menu-dropdown">
         <a href="creator.php"><img class="menu-icon" src="assets/img/icons/creator.png" alt="">Manage Creators</a>
         <a href="category.php"><img class="menu-icon" src="assets/img/icons/tag.png" alt="">Manage Categories</a>
-        <a href="user.html"><img class="menu-icon" src="assets/img/icons/user.png" alt="">Profile &amp; Password</a>
+        <a href="user.php"><img class="menu-icon" src="assets/img/icons/user.png" alt="">Profile &amp; Password</a>
         <a href="logout.php"><img class="menu-icon" src="assets/img/icons/logout.png" alt="">Log Out</a>
       </div>
     </div>

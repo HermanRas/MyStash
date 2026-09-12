@@ -8,8 +8,11 @@ require __DIR__ . '/../src/VideoQuality.php';
 require __DIR__ . '/../src/User.php';
 require __DIR__ . '/../src/VideoQuery.php';
 require __DIR__ . '/../src/CreatorQuery.php';
+require __DIR__ . '/../src/Rekey.php';
 
 use MyStash\CreatorQuery;
+use MyStash\Datastore;
+use MyStash\Rekey;
 use MyStash\Crypto7z;
 use MyStash\User;
 use MyStash\VideoEncoder;
@@ -286,5 +289,64 @@ step('an array q is ignored on the creator search',
     CreatorQuery::fromRequest(['q' => ['x']])->search === '');
 step('a creator search counts as filtered',
     CreatorQuery::fromRequest(['q' => 'x'])->isFiltered() && !CreatorQuery::fromRequest([])->isFiltered());
+
+// Password change / re-keying (Docs/PLAN.md 6.1). Runs against a throwaway
+// stash of its own — never the caller's — and removes it again at the end.
+$probe = 'RekeyProbe' . bin2hex(random_bytes(3));
+$oldKey = 'probe-old-password-aaaaaaaa';
+$newKey = 'probe-new-password-bbbbbbbb';
+
+$users = new User();
+step("create a throwaway stash ({$probe})", $users->create($probe, $oldKey));
+
+$store = new Datastore();
+$store->saveVideoMetadata($probe, $oldKey, '1', ['id' => '1', 'title' => 'Probe clip']);
+
+$rekey = new Rekey();
+
+step(
+    'a too-short new password is refused',
+    $rekey->run($probe, $oldKey, 'short')['ok'] === false,
+);
+step(
+    'reusing the current password is refused',
+    $rekey->run($probe, $oldKey, $oldKey)['ok'] === false,
+);
+step(
+    'a wrong current password is refused',
+    $rekey->run($probe, 'not-the-current-password-x', $newKey)['ok'] === false,
+);
+step(
+    'the stash still opens with the old password after those refusals',
+    $store->loadIndex($probe, $oldKey) !== null,
+);
+
+$result = $rekey->run($probe, $oldKey, $newKey);
+step("re-key succeeds ({$result['message']})", $result['ok']);
+step('it rewrote more than just the index', $result['rewritten'] >= 2);
+
+step('the stash opens with the new password', $store->loadIndex($probe, $newKey) !== null);
+step('the stash no longer opens with the old one', $store->loadIndex($probe, $oldKey) === null);
+step(
+    'per-video metadata came across too, not just the index',
+    ($store->loadVideoMetadata($probe, $newKey, '1')['title'] ?? null) === 'Probe clip',
+);
+
+$leftovers = [];
+$walk = new RecursiveIteratorIterator(
+    new RecursiveDirectoryIterator(Datastore::userDir($probe), FilesystemIterator::SKIP_DOTS),
+);
+foreach ($walk as $file) {
+    if ($file->isFile() && str_ends_with($file->getPathname(), '.enc.old')) {
+        $leftovers[] = $file->getFilename();
+    }
+}
+step(
+    'no .enc.old safety copies are left behind (' . (implode(', ', $leftovers) ?: 'none') . ')',
+    $leftovers === [],
+);
+
+Datastore::wipe(Datastore::userDir($probe));
+step('the throwaway stash is gone', !is_dir(Datastore::userDir($probe)));
 
 echo PHP_EOL . "All smoke tests passed." . PHP_EOL;

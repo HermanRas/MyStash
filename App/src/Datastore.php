@@ -61,7 +61,13 @@ final class Datastore
         return is_dir(self::DATA_ROOT . '/' . $user);
     }
 
-    private function indexArchivePath(string $user): string
+    /** Everything the user owns lives under here. */
+    public static function userDir(string $user): string
+    {
+        return self::DATA_ROOT . '/' . $user;
+    }
+
+    public static function indexArchivePath(string $user): string
     {
         return self::DATA_ROOT . "/{$user}/videos/{$user}.json.enc";
     }
@@ -132,7 +138,7 @@ final class Datastore
             return null;
         }
 
-        return $this->loadJsonArchive($this->indexArchivePath($user), "{$user}.json", $password);
+        return $this->loadJsonArchive(self::indexArchivePath($user), "{$user}.json", $password);
     }
 
     /**
@@ -145,7 +151,7 @@ final class Datastore
             mkdir($videosDir, 0700, true);
         }
 
-        return $this->saveJsonArchive($this->indexArchivePath($user), "{$user}.json", $password, $index);
+        return $this->saveJsonArchive(self::indexArchivePath($user), "{$user}.json", $password, $index);
     }
 
     public function loadVideoMetadata(string $user, string $password, string $id): ?array

@@ -86,6 +86,25 @@ final class Session
     }
 
     /**
+     * Adopts a new password after the stash has been re-keyed under it
+     * (Docs/PLAN.md 6.1), so the session keeps working instead of being
+     * logged out by refreshIndex() the moment the old key stops opening
+     * anything.
+     *
+     * Only ever call this once the re-key has actually succeeded — a session
+     * holding a password the archives are not on is exactly the split-key
+     * state refreshIndex() exists to catch.
+     */
+    public static function setPassword(string $password): void
+    {
+        self::start();
+        // The password changed, so treat it as a fresh authentication.
+        session_regenerate_id(true);
+
+        $_SESSION['password'] = $password;
+    }
+
+    /**
      * Re-reads the index from disk and refreshes the session copy.
      *
      * Every page and endpoint must start from this rather than the snapshot

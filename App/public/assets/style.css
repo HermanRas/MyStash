@@ -605,6 +605,34 @@ select option {
   color: var(--text-muted);
 }
 
+/* ---------- Profile ---------- */
+
+/* A form column, not a grid — capped and centred like the watch page. */
+.profile-layout {
+  max-width: 560px;
+  margin-inline: auto;
+}
+
+/* The outcome of an action, said once at the top of the thing it happened to. */
+.notice {
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin: 0 0 14px;
+  font-size: 13px;
+}
+
+.notice.ok {
+  border-left-color: var(--accent);
+  background: rgba(255, 163, 26, 0.08);
+}
+
+.notice.bad {
+  border-left-color: #cc4444;
+  background: rgba(204, 68, 68, 0.08);
+}
+
 /* The searched-for term, echoed back in the count line and the empty state. */
 .wall-term {
   color: var(--text);
