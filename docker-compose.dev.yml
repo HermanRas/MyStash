@@ -1,0 +1,9 @@
+services:
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.47.0-jammy
+    depends_on:
+      - app
+    working_dir: /work
+    volumes:
+      - ./dev/playwright:/work
+    entrypoint: ["tail", "-f", "/dev/null"]

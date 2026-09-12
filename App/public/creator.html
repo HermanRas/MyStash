@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MyStash — Creators</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <a class="brand" href="wall.html">
+    <img src="assets/img/icon.png" alt="MyStash">
+    MyStash
+  </a>
+  <div class="search-bar">
+    <input type="text" placeholder="Search videos, creators, categories…">
+  </div>
+  <div class="header-actions">
+    <button class="icon-btn">+ Add Creator</button>
+    <div class="user-menu" tabindex="0">
+      <div class="user-menu-trigger">
+        <div class="avatar"></div>
+        TestUser
+      </div>
+      <div class="user-menu-dropdown">
+        <a href="creator.html">Manage Creators</a>
+        <a href="user.html">Profile &amp; Password</a>
+        <a href="login.html">Log Out</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<nav class="category-bar">
+  <a class="pill" href="wall.html">All Videos</a>
+  <span class="pill active">Creators</span>
+</nav>
+
+<h1 class="page-title">Creators</h1>
+
+<main class="container">
+  <div class="creator-grid">
+
+    <div class="creator-card">
+      <div class="creator-avatar" style="--tile-a:#3a3a3a; --tile-b:#161616;"></div>
+      <div class="creator-name">default <span class="verified">✓</span></div>
+      <div class="creator-meta">1 video</div>
+    </div>
+
+    <div class="creator-card">
+      <div class="creator-avatar" style="--tile-a:#4a3a2a; --tile-b:#1a1410;"></div>
+      <div class="creator-name">Alex R. <span class="verified">✓</span></div>
+      <div class="creator-meta">2 videos • Age 29</div>
+    </div>
+
+    <div class="creator-card">
+      <div class="creator-avatar" style="--tile-a:#2a3a3a; --tile-b:#101a1a;"></div>
+      <div class="creator-name">Jamie K.</div>
+      <div class="creator-meta">1 video • Age 34</div>
+    </div>
+
+    <div class="creator-card">
+      <div class="creator-avatar" style="--tile-a:#3a2a3a; --tile-b:#1a101a;"></div>
+      <div class="creator-name">Sam T. <span class="verified">✓</span></div>
+      <div class="creator-meta">4 videos • Age 26</div>
+    </div>
+
+  </div>
+
+  <div class="section-title">Edit Creator</div>
+  <div class="card" style="max-width:480px;">
+    <div class="field">
+      <label for="c-name">Display name</label>
+      <input type="text" id="c-name" value="Alex R.">
+    </div>
+    <div class="field">
+      <label for="c-age">Age</label>
+      <input type="number" id="c-age" value="29">
+    </div>
+    <div class="field">
+      <label for="c-gender">Gender</label>
+      <input type="text" id="c-gender" value="Female">
+    </div>
+    <div class="field">
+      <label for="c-bio">Short bio</label>
+      <input type="text" id="c-bio" placeholder="Short bio…">
+    </div>
+    <button class="btn" style="width:auto; padding:8px 20px;">Save Changes</button>
+    <button class="btn secondary" style="width:auto; padding:8px 20px;">Delete Creator</button>
+  </div>
+</main>
+
+</body>
+</html>
