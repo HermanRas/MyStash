@@ -42,8 +42,8 @@
 1. User uploads a video file. `creator` defaults to `default`; `format` is whatever was uploaded.
 2. If the uploaded format is not MP4 (H.265/HEVC), the video is tagged `not converted`.
 3. On ingestion, the app generates:
-   - A preview image (default: frame at 15s, or a user-chosen timestamp)
-   - A short silent preview clip
+   - **A preview image** — by default the frame at 15s. The user may instead pick a different timestamp, or upload their own image. This can be changed after upload, from the video's edit screen.
+   - **A preview clip** — a *timelapse*, not an excerpt: one frame sampled every 15s across the whole video, joined into a short clip with no sound. So the preview skims the entire video rather than showing one continuous moment.
    - Encrypted metadata
 4. All generated artifacts are encrypted and written to the datastore (§3).
 
@@ -121,7 +121,7 @@ High-contrast dark theme, optimized for media consumption.
 +-----------------------------------------------------------------------+
 |  LOGO  |  [ Search Bar... ]  (Categories)  |  [Filters] [User Profile]|
 +-----------------------------------------------------------------------+
-| (All)  [Category A]  [Category B]  [People/Creators]  [Top Rated] ...  |
+| (All)  [Most Recent]  [Not Converted]  [Creators]  [Category A] ...    |
 +-----------------------------------------------------------------------+
 |                                                                       |
 |  +--------------+  +--------------+  +--------------+  +--------------+  |
@@ -136,11 +136,11 @@ High-contrast dark theme, optimized for media consumption.
 +-----------------------------------------------------------------------+
 ```
 
-**Header & Navigation:** Sticky, dark. Brand mark left, search bar (with auto-complete) center, user actions right. A horizontally scrolling category pill bar sits directly beneath (Trending, Most Recent, Category Names, Creators, ...).
+**Header & Navigation:** Sticky, dark. Brand mark left, search bar (with auto-complete) center, user actions right. A horizontally scrolling category pill bar sits directly beneath (Most Recent, Not Converted, Creators, then the global category names). There are deliberately no ranking pills such as "Trending" or "Top Rated" — this is a personal wall with no ratings (see §2.8).
 
 **Media Grid:** CSS Grid, `repeat(auto-fill, minmax(280px, 1fr))`. Gap 12–16px. Container padding 16–24px.
 
-**Creator Directory:** 6–8 column grid, circular avatars (`border-radius: 50%`), hover border transition to `#ffa31a`. Metadata: display name, view/subscriber count, verified badge.
+**Creator Directory:** 6–8 column grid, circular avatars (`border-radius: 50%`), hover border transition to `#ffa31a`. Metadata: display name, video count, view count, age, verified badge.
 
 ### 4.3 Video Tile Specification
 
@@ -151,7 +151,7 @@ High-contrast dark theme, optimized for media consumption.
 | Quality Badge | Bottom-left overlay | Small amber rounded tag, e.g. `4K`, `HD` |
 | Title | Below thumbnail | 14px, line-height 1.3, bold white, 2-line clamp + ellipsis |
 | Creator/Channel | Under title | 12px, `#888888`, inline verified badge if applicable |
-| Stats Line | Bottom row | 12px, `#888888`, e.g. `1.4M views • 96%` |
+| Stats Line | Bottom row | 12px, `#888888`. Shows length, view count and categories, e.g. `14:20 • 128 views • Personal, Highlights`. No rating or score — there are no likes/ratings anywhere in the app |
 
 ### 4.4 Hover-to-Preview Technical Specification
 
@@ -160,7 +160,9 @@ High-contrast dark theme, optimized for media consumption.
 2. Debounce 150–200ms before triggering, to avoid firing during rapid scroll.
 3. `mouseleave` cancels pending timers, stops playback, restores static thumbnail instantly.
 
-**Preview implementation options (pick one per deployment):**
+**In use: option 2 (short video clip injection)** — the encrypted `{ID}.mp4.preview.enc` timelapse from §2.3, served through `media.php` and played in a `<video muted loop playsinline>` on hover. The other two options are recorded here as alternatives only.
+
+**Preview implementation options:**
 
 1. **Sprite sheet frame scrubbing (recommended for performance):** one composite `spritesheet.jpg` with 10–15 frames generated at ingestion; on hover, `setInterval` every 200–300ms steps `background-position`.
 2. **Short video clip injection:** low-bitrate 3–5s `preview.mp4`; on hover, append/unhide a `<video muted loop playsinline>` and `.play()`.
