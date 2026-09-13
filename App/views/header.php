@@ -7,7 +7,8 @@ declare(strict_types=1);
  *
  * Callers set $navActive to 'videos', 'creators' or 'categories' before
  * including this, and may set $headerActions to extra HTML for the right-hand
- * button group.
+ * button group. A page with no pill of its own (the playlist screens) sets
+ * something that matches none of them, and no pill lights up.
  *
  * There is exactly one search box on the site, and it is this one. It searches
  * whatever the page you are on is a list of: videos everywhere (landing on the
@@ -99,6 +100,11 @@ $navPills = [
       </div>
       <div class="user-menu-dropdown">
         <a href="creator.php"><img class="menu-icon" src="assets/img/icons/creator.png" alt="">Manage Creators</a>
+        <?php /* Playlists live here and not in the pill bar: §4.2 fixes that
+                 bar at exactly three destinations, and a fourth would make it
+                 the place category names were kept out of for the same
+                 reason. */ ?>
+        <a href="playlist.php"><img class="menu-icon" src="assets/img/icons/playlist.png" alt="">Playlists</a>
         <a href="category.php"><img class="menu-icon" src="assets/img/icons/tag.png" alt="">Manage Categories</a>
         <a href="user.php"><img class="menu-icon" src="assets/img/icons/user.png" alt="">Profile &amp; Password</a>
         <a href="logout.php"><img class="menu-icon" src="assets/img/icons/logout.png" alt="">Log Out</a>

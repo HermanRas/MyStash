@@ -13,6 +13,7 @@ require __DIR__ . '/../src/Jobs.php';
 require_once __DIR__ . '/../src/LoginThrottle.php';
 require_once __DIR__ . '/../src/VideoIngest.php';
 require_once __DIR__ . '/../src/VideoPreview.php';
+require_once __DIR__ . '/../src/Playlists.php';
 
 use MyStash\CreatorQuery;
 use MyStash\Datastore;
@@ -26,6 +27,7 @@ use MyStash\VideoPreview;
 use MyStash\VideoCreators;
 use MyStash\VideoQuality;
 use MyStash\LoginThrottle;
+use MyStash\Playlists;
 use MyStash\VideoQuery;
 
 function step(string $label, bool $ok): void
@@ -980,5 +982,99 @@ step('...and adds nothing to work that was already slower',
 
 $clearThrottle();
 step('cleaned up', glob('/dev/shm/mystash-login/*.json') === []);
+
+echo PHP_EOL . "-- playlists (5.4) --" . PHP_EOL;
+
+// A bare index, the way a stash that predates playlists looks.
+$plIndex = ['videos' => [
+    ['id' => '1', 'title' => 'One'],
+    ['id' => '2', 'title' => 'Two'],
+    ['id' => '3', 'title' => 'Three'],
+]];
+
+step('a stash with no playlists key reads as no playlists', Playlists::all($plIndex) === []);
+
+$plId = Playlists::create($plIndex, 'Watch Later');
+step('creating a playlist returns its id', $plId === '1');
+step('...and it is stored with an empty video list',
+    Playlists::find($plIndex, '1')['videos'] === []);
+
+step('a blank name is refused', Playlists::create($plIndex, '   ') === null);
+step('a name over the limit is refused',
+    Playlists::create($plIndex, str_repeat('x', Playlists::MAX_NAME_LENGTH + 1)) === null);
+step('...and neither refusal created anything', count(Playlists::all($plIndex)) === 1);
+
+// Names are a label, not a key: two lists may share one.
+$dupId = Playlists::create($plIndex, 'Watch Later');
+step('two playlists may carry the same name', $dupId === '2' && count(Playlists::all($plIndex)) === 2);
+
+$known = ['1', '2', '3'];
+
+Playlists::setVideos($plIndex, '1', ['3', '1'], $known);
+step('setVideos stores exactly the order it was given',
+    Playlists::find($plIndex, '1')['videos'] === ['3', '1']);
+
+// The order IS the playlist, so a reorder is just another setVideos.
+Playlists::setVideos($plIndex, '1', ['1', '3'], $known);
+step('...and a reorder rewrites it', Playlists::find($plIndex, '1')['videos'] === ['1', '3']);
+
+Playlists::setVideos($plIndex, '1', ['1', '9', '2'], $known);
+step('an id the stash does not hold is dropped rather than stored',
+    Playlists::find($plIndex, '1')['videos'] === ['1', '2']);
+
+Playlists::setVideos($plIndex, '1', ['2', '1', '2'], $known);
+step('a duplicate collapses to its first position',
+    Playlists::find($plIndex, '1')['videos'] === ['2', '1']);
+
+step('toggle adds a video that is absent', Playlists::toggle($plIndex, '1', '3') === true);
+step('...on the end, leaving the order alone',
+    Playlists::find($plIndex, '1')['videos'] === ['2', '1', '3']);
+step('toggle removes a video that is present', Playlists::toggle($plIndex, '1', '1') === false);
+step('...and closes the gap', Playlists::find($plIndex, '1')['videos'] === ['2', '3']);
+
+Playlists::toggle($plIndex, '2', '3');
+step('containing() finds every playlist holding a video',
+    Playlists::containing($plIndex, '3') === ['1', '2']);
+step('...and none for a video on no list', Playlists::containing($plIndex, '1') === []);
+
+step('renaming changes the name', Playlists::rename($plIndex, '1', 'Later') === true
+    && Playlists::find($plIndex, '1')['name'] === 'Later');
+step('...and nothing else — the videos are untouched',
+    Playlists::find($plIndex, '1')['videos'] === ['2', '3']);
+step('renaming to a blank name is refused', Playlists::rename($plIndex, '1', '') === false);
+step('renaming a playlist that does not exist is refused',
+    Playlists::rename($plIndex, '99', 'Nope') === false);
+
+// What video_delete.php calls: a playlist must never hold a video that is gone.
+Playlists::forgetVideo($plIndex, '3');
+step('deleting a video drops it from every playlist',
+    Playlists::find($plIndex, '1')['videos'] === ['2']
+    && Playlists::find($plIndex, '2')['videos'] === []);
+
+$plBefore = count($plIndex['videos']);
+Playlists::delete($plIndex, '2');
+step('deleting a playlist removes it', Playlists::find($plIndex, '2') === null);
+step('...and does not touch the videos', count($plIndex['videos']) === $plBefore);
+
+// Ids appear in URLs, so a bookmark to a deleted playlist must not open a
+// different one that happens to have been created since.
+$reuse = Playlists::create($plIndex, 'Fresh');
+step('a deleted playlist id is never handed out again', $reuse === '3');
+
+// videosOf() is what both screens render from.
+$rows = Playlists::videosOf($plIndex, Playlists::find($plIndex, '1'));
+step('videosOf returns index entries in playlist order',
+    array_column($rows, 'id') === ['2']);
+
+$stale = ['id' => '9', 'name' => 'Stale', 'videos' => ['2', '404', '1']];
+step('...and skips an id with no video behind it rather than rendering a hole',
+    array_column(Playlists::videosOf($plIndex, $stale), 'id') === ['2', '1']);
+
+// A record written by an older build, or hand-edited, must read like any other.
+$ragged = ['playlists' => [['name' => 'Ragged']]];
+$norm = Playlists::all($ragged)[0];
+step('a playlist record missing its fields is filled in, not fatal',
+    $norm['videos'] === [] && $norm['name'] === 'Ragged' && $norm['id'] === '0');
+
 
 echo PHP_EOL . "All smoke tests passed." . PHP_EOL;

@@ -18,6 +18,12 @@ require_once __DIR__ . '/Crypto7z.php';
  *   "categories": { "<name>": "<hex color>" },   // global category definitions
  *   "creators":   { "<name>": {"id","name","age","gender","bio"} },
  *                                                // DENORMALIZED — see CreatorStore
+ *   "playlists": [
+ *     {"id", "name", "videos": ["<video id>", ...],  // ORDER IS THE PLAYLIST
+ *      "created_at", "updated_at"}
+ *   ],                                           // see Playlists
+ *   "playlist_seq": 4,                           // highest playlist id ever
+ *                                                // issued; ids are not reused
  *   "videos": [
  *     {
  *       "id", "title", "description", "creators": ["<name>", ...],
@@ -41,6 +47,12 @@ require_once __DIR__ . '/Crypto7z.php';
  *   "categories": [ {"name": "<global category name>", "timestamp_seconds": 0} ],
  *   "preview_capture_seconds"
  * }
+ *
+ * Playlists are the one collection keyed by id rather than by display name,
+ * because nothing references a playlist by name — so a rename touches one
+ * field instead of walking every video. A video carries no playlist field at
+ * all: membership is stored once, on the playlist, where the ordering has to
+ * live anyway.
  *
  * A video may carry the same category more than once at different timestamps —
  * each entry is an independent assignment. The index keeps only the unique

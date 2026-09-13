@@ -227,6 +227,13 @@ a {
   filter: brightness(0);
 }
 
+/* ...but a secondary button is dark, not amber, so knocking the icon back to
+   black there hides it against its own background. Download has been wearing
+   a nearly invisible icon for exactly this reason. */
+.btn.secondary .btn-icon {
+  filter: none;
+}
+
 .user-menu-dropdown {
   display: none;
   position: absolute;
@@ -1193,4 +1200,351 @@ select option {
   gap: 12px;
   align-items: flex-end;
   margin-bottom: 12px;
+}
+
+/* ---------- Playlists (PLAN 5.4) ---------- */
+
+/* The card grid. Narrower columns than the wall's 280px: a playlist card is a
+   name over a strip of thumbnails, so it needs less width than a tile whose
+   whole point is the thumbnail. */
+.playlist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.playlist-card {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease;
+}
+
+.playlist-card:hover {
+  border-color: var(--accent);
+}
+
+/* The first few thumbnails, side by side. The leading one takes twice the
+   width of the rest, which is what makes the strip read as "this playlist,
+   and some more" rather than as three unrelated tiles. */
+.playlist-thumbs {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 2px;
+  background: var(--bg);
+  aspect-ratio: 16 / 9;
+}
+
+.playlist-thumb {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-alt);
+}
+
+.playlist-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* An empty playlist still needs a card of the same height, or the grid rows
+   jump around as lists are filled. */
+.playlist-thumb.empty {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.playlist-thumb .badge.duration {
+  right: 4px;
+  bottom: 4px;
+  font-size: 10px;
+}
+
+/* Only the lead thumbnail is wide enough for a duration badge to be legible. */
+.playlist-thumb:not(:first-child) .badge.duration {
+  display: none;
+}
+
+.playlist-card-body {
+  padding: 10px 12px 12px;
+}
+
+.playlist-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.playlist-card-meta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ---------- Playlist edit rows ---------- */
+
+.playlist-rows {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.playlist-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--surface-alt);
+  margin-bottom: 6px;
+}
+
+/* The row being dragged stays in the list and is faded, rather than being
+   lifted out of it: the gap left behind is the drop target preview, and
+   removing the element would make the list jump under the pointer. */
+.playlist-row.dragging {
+  opacity: 0.4;
+  border-color: var(--accent);
+}
+
+.playlist-grip {
+  cursor: grab;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 4px;
+  user-select: none;
+}
+
+.playlist-grip:active {
+  cursor: grabbing;
+}
+
+.playlist-row-thumb {
+  position: relative;
+  flex: 0 0 120px;
+  aspect-ratio: 16 / 9;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--bg);
+  display: block;
+}
+
+.playlist-row-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.playlist-row-thumb .badge.duration {
+  right: 3px;
+  bottom: 3px;
+  font-size: 10px;
+}
+
+.playlist-row-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.playlist-row-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playlist-row-title:hover {
+  color: var(--accent);
+}
+
+.playlist-row-meta {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.playlist-status {
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+/* ---------- The watch page's playlist dropdown ---------- */
+
+/* It reuses .sort-menu wholesale, so it opens and closes exactly like the sort
+   and user menus. Only the things a list of checkboxes needs are set here. */
+.playlist-menu .playlist-dropdown {
+  right: auto;
+  left: 0;
+  min-width: 220px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+
+.playlist-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.playlist-option:hover {
+  background: var(--surface-alt);
+}
+
+.playlist-option input {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+
+.playlist-manage {
+  display: block;
+  padding: 8px 14px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.playlist-manage:hover {
+  color: var(--accent);
+}
+
+/* ---------- The add-videos modal ---------- */
+
+.modal {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0;
+  width: min(640px, 92vw);
+  max-height: 84vh;
+}
+
+.modal::backdrop {
+  background: rgba(0, 0, 0, 0.66);
+}
+
+.modal-inner {
+  display: flex;
+  flex-direction: column;
+  max-height: 84vh;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.modal-search {
+  margin: 14px 16px 8px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text);
+  font-size: 13px;
+}
+
+/* The list scrolls, not the dialog: the search box and the buttons stay put
+   while a long stash is scrolled through. */
+.modal-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px;
+}
+
+.modal-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.modal-row:hover {
+  background: var(--surface-alt);
+}
+
+/* Already on the playlist: readable, but plainly not something to tick again. */
+.modal-row.on-list {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.modal-row input {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.modal-row-body {
+  min-width: 0;
+}
+
+.modal-row-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modal-row-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 640px) {
+  .playlist-row-thumb {
+    flex-basis: 90px;
+  }
 }

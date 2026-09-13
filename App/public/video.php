@@ -12,6 +12,7 @@ require_once __DIR__ . '/../src/VideoPreview.php';
 use MyStash\CreatorStore;
 use MyStash\Datastore;
 use MyStash\Jobs;
+use MyStash\Playlists;
 use MyStash\Session;
 use MyStash\VideoCategories;
 use MyStash\VideoCreators;
@@ -66,12 +67,14 @@ function creatorAvatarUrl(array $creators, string $name): ?string
         : null;
 }
 
-function formatLength(int $seconds): string
-{
-    return $seconds >= 3600
-        ? sprintf('%d:%02d:%02d', intdiv($seconds, 3600), intdiv($seconds % 3600, 60), $seconds % 60)
-        : sprintf('%02d:%02d', intdiv($seconds, 60), $seconds % 60);
-}
+require_once __DIR__ . '/../src/Playlists.php';
+require_once __DIR__ . '/../views/format.php';
+
+// Which playlists exist, and which of them already hold this video. Membership
+// is stored on the playlist, never on the video (see Playlists), so this is a
+// scan rather than a field.
+$playlists = Playlists::all($index);
+$onPlaylists = Playlists::containing($index, $id);
 
 $navActive = 'videos';
 ?>
@@ -165,6 +168,31 @@ $navActive = 'videos';
     <?php if (!$editing): ?>
       <div class="form-actions">
         <a class="btn secondary" href="video.php?id=<?= urlencode($id) ?>&edit=1">Edit Video</a>
+
+        <?php /* Built like the sort menu and the user menu — a trigger with a
+                 panel that opens on hover or focus — so the three dropdowns on
+                 the site behave the same way. Each tick posts on its own
+                 rather than waiting for an Apply: there is nothing to cancel,
+                 and a dropdown that has to be confirmed is a dialog. */ ?>
+        <div class="sort-menu playlist-menu" tabindex="0">
+          <button type="button" class="btn secondary playlist-trigger" aria-label="Add to playlist">
+            <img class="btn-icon" src="assets/img/icons/playlist.png" alt="">Playlist +
+          </button>
+          <div class="sort-menu-dropdown playlist-dropdown" data-video="<?= htmlspecialchars($id, ENT_QUOTES) ?>">
+            <?php if ($playlists === []): ?>
+              <p class="hint" style="margin:6px 12px; white-space:nowrap;">No playlists yet.</p>
+            <?php else: ?>
+              <?php foreach ($playlists as $playlist): ?>
+                <label class="playlist-option">
+                  <input type="checkbox" value="<?= htmlspecialchars($playlist['id'], ENT_QUOTES) ?>"
+                         <?= in_array($playlist['id'], $onPlaylists, true) ? 'checked' : '' ?>>
+                  <span><?= htmlspecialchars($playlist['name'], ENT_QUOTES) ?></span>
+                </label>
+              <?php endforeach; ?>
+            <?php endif; ?>
+            <a class="playlist-manage" href="playlist.php">Manage playlists…</a>
+          </div>
+        </div>
 
         <?php /* The way back out. Everything in the stash is encrypted with a
                  password 7zip holds, so without this the only way to get a
@@ -394,6 +422,34 @@ $navActive = 'videos';
       player.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
   });
+
+  // Playlist checkboxes post one at a time. The box is moved back if the write
+  // fails, so what is ticked is always what the stash actually holds rather
+  // than what the click hoped for.
+  const playlistPanel = document.querySelector('.playlist-dropdown');
+
+  if (playlistPanel) {
+    playlistPanel.addEventListener('change', (e) => {
+      const box = e.target;
+      if (box.type !== 'checkbox') return;
+
+      box.disabled = true;
+
+      const body = new URLSearchParams();
+      body.append('playlist', box.value);
+      body.append('video', playlistPanel.dataset.video);
+
+      fetch('playlist_toggle.php', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'fetch' },
+        body,
+      })
+        .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+        .then((data) => { box.checked = data.in_playlist; })
+        .catch(() => { box.checked = !box.checked; })
+        .finally(() => { box.disabled = false; });
+    });
+  }
 </script>
 <script src="assets/job.js"></script>
 

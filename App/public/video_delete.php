@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../src/Crypto7z.php';
 require_once __DIR__ . '/../src/Datastore.php';
+require_once __DIR__ . '/../src/Playlists.php';
 require_once __DIR__ . '/../src/Session.php';
 
 use MyStash\Datastore;
+use MyStash\Playlists;
 use MyStash\Session;
 
 Session::requireLogin();
@@ -46,6 +48,11 @@ $index['videos'] = array_values(array_filter(
     $index['videos'],
     static fn($v) => $v['id'] !== $id,
 ));
+
+// A playlist holding a video that no longer exists renders as a gap and makes
+// "5 videos" mean something other than five, so the lists are cleaned up in
+// the same write that removes the entry (5.4).
+Playlists::forgetVideo($index, $id);
 
 $videoDir = Datastore::videoDir(Session::user(), $id);
 if (is_dir($videoDir)) {

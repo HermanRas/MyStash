@@ -32,12 +32,7 @@ foreach ($creators as $creator) {
 }
 ksort($genders);
 
-function formatLength(int $seconds): string
-{
-    return $seconds >= 3600
-        ? sprintf('%d:%02d:%02d', intdiv($seconds, 3600), intdiv($seconds % 3600, 60), $seconds % 60)
-        : sprintf('%02d:%02d', intdiv($seconds, 60), $seconds % 60);
-}
+require_once __DIR__ . '/../views/format.php';
 
 // A→Z / Z→A for the title sorts, 0→9 / 9→0 for the numeric ones.
 $sortIcon = match ($query->sort) {

@@ -125,6 +125,66 @@ Filtering and sorting are applied **server-side**, against the already-decrypted
 
 The top of the length slider is an **open end**, not a ceiling: at maximum it reads "any" and stops filtering on length.
 
+### 2.9 Playlists
+
+A playlist is a **named, ordered set of videos**. Nothing is copied: a video can
+sit on any number of playlists, and taking it off one leaves the video and every
+other playlist alone.
+
+- **Where they live.** In the index, beside categories and creators — a playlist
+  owns no files of its own, so §3 gains no new paths.
+- **Keyed by id, not name.** Categories and creators are keyed by display name
+  because that name *is* the reference a video holds, which is why renaming a
+  creator has to repoint every video. Nothing references a playlist by name, so
+  a rename is one field on one record. Two playlists may share a name; a name is
+  a label, not a key.
+- **Membership is stored once, on the playlist** — a video carries no playlist
+  field. The order has to live on the playlist anyway, so a copy on the video
+  could only ever be the one that goes stale. "Which playlists is this video
+  in?" is a scan of a few short arrays.
+- **The order is the playlist.** It is what dragging a row rewrites, and it is
+  stored exactly as posted. Ids the stash does not hold are dropped and repeats
+  collapse to their first position.
+- **Ids are never reused.** They appear in URLs, so a bookmark to a deleted
+  playlist must land nowhere rather than quietly open whatever was created after
+  it. The index keeps a high-water mark (`playlist_seq`) that survives a delete.
+- **Deleting a video** drops it from every playlist that held it, in the same
+  write. **Deleting a playlist** removes the list only — never the videos.
+
+**Reached from the user dropdown in the nav bar**, beside "Manage Creators" and
+"Manage Categories". Deliberately *not* a fourth nav pill: §4.2 fixes that bar
+at three destinations, and a fourth would make it the very thing category names
+were kept out of it for.
+
+**The playlists screen** (`playlist.php`) is a grid of cards, each showing the
+playlist's name, its video count, and the first **three** videos as a strip of
+thumbnails. A card is for recognising a playlist, not reading it — the whole
+list is one click away, and a card that grew with its playlist would push the
+next one off the screen.
+
+**The playlist screen** (`playlist.php?id=N`) lists every video in playlist
+order. Rows are reordered by **dragging them by their handle**, and the new
+order saves on drop — the browser posts the whole order it is showing, never a
+"move X above Y", so what is stored is what the user can see even if the list
+changed in another tab. Each row also has a Remove, and the screen carries
+rename and delete.
+
+**Adding videos** is a button in the header — the same place the Creators screen
+puts "Add Creator" — opening a modal of every video in the stash with a checkbox
+each. Videos already on the playlist show ticked and disabled. The modal's
+search matches the same three fields the site's search does (title, creators,
+category names), filtered in the browser because the list is already decrypted
+for that page.
+
+**From a video's watch page**, a `Playlist +` button opens a dropdown of every
+playlist with a checkbox against each — built like the sort and user menus, so
+the three dropdowns on the site behave alike. Each tick posts on its own; a
+newly added video goes on the **end**, because appending is the only insertion
+point that does not disturb an order the user arranged.
+
+There is no "play all" or shuffle: a playlist is a way of keeping videos
+together, and playback is still one video at a time from the watch page.
+
 ## 3. Datastore Layout
 
 All data is stored locally per-user; the app stores nothing server-side outside each user's own datastore directory. Multiple users each get their own isolated datastore and video wall.
@@ -141,6 +201,11 @@ App/Data/{user}/creators/Creator{ID}/{ID}.json.enc             # encrypted creat
 App/Data/{user}/creators/Creator{ID}/{ID}.profile.png.enc      # encrypted creator profile picture
 App/Data/{user}/**/*.enc.old                                   # transient safety copy during re-encryption only
 ```
+
+**Playlists add no files.** They live in the index (§2.9) as a list of
+`{id, name, videos: [<video id>, ...]}`, plus a `playlist_seq` high-water mark
+so a deleted playlist's id is never reissued. A playlist owns nothing on disk,
+which is also why deleting one can never cost a video.
 
 **A video may credit more than one creator.** Both the index entry and the per-video metadata carry `"creators": ["<name>", ...]`, and the edit screen offers the global creator list as checkboxes. Every video has at least one: emptying the list falls back to `default`, the creator ingestion assigns and the only one that cannot be deleted. Deleting a creator drops them from every video they were on rather than reassigning the whole video, so a video credited to two people keeps the other. Entries written before this carry a single `creator` string; reads go through `VideoCreators::of()`, and `bin/migrate_records.php` rewrites them.
 
@@ -196,6 +261,10 @@ High-contrast dark theme, optimized for media consumption.
 ```
 
 **Header & Navigation:** Sticky, dark. Brand mark left, search bar (with auto-complete) center, user actions right. A pill bar sits directly beneath with exactly three destinations, identical on every page: **All Videos**, **Creators**, **Categories** (`App/views/header.php`).
+
+Playlists are reached from the user dropdown, not from this bar, for the same
+reason the bar carries no category names: three destinations, fixed, identical
+on every page.
 
 The nav deliberately carries **no category names** — those live in the wall's left filter panel, and having both was two ways to do the same thing. It carries no "Most Recent" either: that is a sort order, and it belongs in the sort menu. There are likewise no ranking pills such as "Trending" or "Top Rated" — this is a personal wall with no ratings (see §2.8). `All Videos` points at the bare wall URL, so it also resets whatever filters are applied.
 
