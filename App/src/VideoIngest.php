@@ -6,6 +6,7 @@ namespace MyStash;
 
 require_once __DIR__ . '/VideoQuality.php';
 require_once __DIR__ . '/VideoCreators.php';
+require_once __DIR__ . '/VideoPreview.php';
 
 /**
  * Upload/ingestion pipeline (Docs/PLAN.md Phase 3, Docs/SPECIFICATIONS.md §2.3):
@@ -25,6 +26,10 @@ final class VideoIngest
      * @param array $index current decrypted index, used only to pick the next ID
      * @param float|null $previewTimestamp user-chosen preview capture point in
      *        seconds; defaults to 15s (clamped to the video's duration)
+     * @param string|null $previewImagePathIn a picture the user supplied to use
+     *        as the preview instead of a frame from the video (3.9). Wins over
+     *        $previewTimestamp when both are given — someone who attached an
+     *        image meant it.
      * @return array the new video's index summary entry
      */
     public function ingest(
@@ -34,6 +39,7 @@ final class VideoIngest
         string $originalFilename,
         array $index,
         ?float $previewTimestamp = null,
+        ?string $previewImagePathIn = null,
     ): array {
         $id = Datastore::nextVideoId($index);
         $ext = strtolower(pathinfo($originalFilename, PATHINFO_EXTENSION)) ?: 'mp4';
@@ -56,7 +62,25 @@ final class VideoIngest
             $previewAt = $previewTimestamp ?? min(15.0, max(0.0, $duration - 0.5));
 
             $previewImagePath = "{$workDir}/preview.jpg";
-            $this->encoder->extractFrame($originalPath, $previewImagePath, $previewAt);
+            $customPreview = false;
+
+            // A supplied picture is re-encoded to JPEG rather than stored as
+            // it arrived, so the archive's name describes its contents and
+            // nothing but ffmpeg's own output is ever served back (3.9). If it
+            // turns out not to be an image, fall through to the frame grab —
+            // refusing the whole upload over the thumbnail would be a poor
+            // trade for a video that has already been transferred.
+            if ($previewImagePathIn !== null) {
+                $customPreview = $this->encoder->convertImage(
+                    $previewImagePathIn,
+                    $previewImagePath,
+                    VideoPreview::MAX_EDGE,
+                );
+            }
+
+            if (!$customPreview) {
+                $this->encoder->extractFrame($originalPath, $previewImagePath, $previewAt);
+            }
 
             // The clip is a timelapse over the whole video, so unlike the
             // preview image it doesn't start from the chosen timestamp.
@@ -73,6 +97,26 @@ final class VideoIngest
             $assignments = $notConverted ? [['name' => 'Not Converted', 'timestamp_seconds' => 0]] : [];
             $categories = Datastore::categoryNames($assignments);
 
+            // Claim the directory before anything is written into it.
+            //
+            // nextVideoId() reads the *index*, so two uploads that both start
+            // before either has saved compute the same id — and the second
+            // would then encrypt its files straight over the first's, losing
+            // that video outright. mkdir() is the atomic test-and-set that
+            // settles it: whoever creates the directory owns the id, and the
+            // loser tries the next one. Single-threaded PHP made this
+            // unreachable; nginx in front of php-fpm (7.5) does not.
+            $videoDir = Datastore::videoDir($user, $id);
+
+            while (!@mkdir($videoDir, 0700, true)) {
+                if (!is_dir($videoDir)) {
+                    throw new \RuntimeException("Could not create {$videoDir}");
+                }
+
+                $id = (string) ((int) $id + 1);
+                $videoDir = Datastore::videoDir($user, $id);
+            }
+
             $metadata = [
                 'id' => $id,
                 'title' => pathinfo($originalFilename, PATHINFO_FILENAME),
@@ -87,13 +131,12 @@ final class VideoIngest
                 'not_converted' => $notConverted,
                 'uploaded_at' => date('c'),
                 'categories' => $assignments,
-                'preview_capture_seconds' => $previewAt,
+                // null when the picture came from the user: it no longer
+                // corresponds to any point in the video.
+                'preview_capture_seconds' => $customPreview ? null : $previewAt,
             ];
             $metadataPath = "{$workDir}/{$id}.json";
             file_put_contents($metadataPath, json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-
-            $videoDir = Datastore::videoDir($user, $id);
-            mkdir($videoDir, 0700, true);
 
             $this->crypto->encrypt($originalPath, "{$videoDir}/{$id}.mp4.enc", $password);
             $this->crypto->encrypt($previewClipPath, "{$videoDir}/{$id}.mp4.preview.enc", $password);

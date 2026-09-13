@@ -101,6 +101,14 @@ $headerActions = '<button class="icon-btn square" id="upload-toggle" title="Uplo
       <label for="preview-at">Preview capture time, seconds (optional — defaults to 15s)</label>
       <input type="number" id="preview-at" name="preview_at" min="0" step="1" placeholder="15">
     </div>
+    <?php /* 3.9 — a picture of your own instead of a frame from the video.
+             Attaching one wins over the capture time above: someone who chose
+             an image meant it. Either can be changed afterwards from the
+             video's edit screen, which is the half that was missing entirely. */ ?>
+    <div class="field">
+      <label for="preview-image">Preview image (optional — overrides the capture time)</label>
+      <input type="file" id="preview-image" name="preview_image" accept="image/*">
+    </div>
     <button type="submit" class="btn">Upload</button>
   </form>
 </div>

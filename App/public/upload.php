@@ -29,6 +29,14 @@ $previewAt = isset($_POST['preview_at']) && $_POST['preview_at'] !== ''
     ? (float) $_POST['preview_at']
     : null;
 
+// An optional picture to use as the preview instead of a frame from the video
+// (3.9). Unlike the video itself a missing or failed one is not fatal —
+// ingestion falls back to the capture time.
+$previewImage = $_FILES['preview_image'] ?? null;
+$previewImagePath = ($previewImage !== null && $previewImage['error'] === UPLOAD_ERR_OK)
+    ? $previewImage['tmp_name']
+    : null;
+
 $index = Session::refreshIndex();
 
 $entry = (new VideoIngest())->ingest(
@@ -38,6 +46,7 @@ $entry = (new VideoIngest())->ingest(
     $file['name'],
     $index,
     $previewAt,
+    $previewImagePath,
 );
 
 $index['videos'][] = $entry;

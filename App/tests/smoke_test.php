@@ -10,6 +10,8 @@ require __DIR__ . '/../src/VideoQuery.php';
 require __DIR__ . '/../src/CreatorQuery.php';
 require __DIR__ . '/../src/Rekey.php';
 require __DIR__ . '/../src/Jobs.php';
+require_once __DIR__ . '/../src/VideoIngest.php';
+require_once __DIR__ . '/../src/VideoPreview.php';
 
 use MyStash\CreatorQuery;
 use MyStash\Datastore;
@@ -18,6 +20,8 @@ use MyStash\Crypto7z;
 use MyStash\Jobs;
 use MyStash\User;
 use MyStash\VideoEncoder;
+use MyStash\VideoIngest;
+use MyStash\VideoPreview;
 use MyStash\VideoCreators;
 use MyStash\VideoQuality;
 use MyStash\VideoQuery;
@@ -648,5 +652,173 @@ step('the name is free to use again', $users->create($doomed, $doomedKey));
 
 Datastore::wipe(Datastore::userDir($doomed));
 step('cleaned up', !is_dir(Datastore::userDir($doomed)));
+
+// ---------------------------------------------------------------------------
+// Changing a video's preview image (Docs/PLAN.md 3.9)
+//
+// The preview archive is the only copy of that image, so the invariant that
+// matters most here is 4.29's: a re-preview that fails must leave the previous
+// picture byte-for-byte intact rather than leaving the video with none.
+// ---------------------------------------------------------------------------
+
+echo PHP_EOL . "-- changing a video's preview --" . PHP_EOL;
+
+$previewUser = 'PrevProbe' . bin2hex(random_bytes(3));
+$previewKey = 'preview-probe-password-aaaaaaaa';
+$users = new User();
+
+step("create a throwaway stash ({$previewUser})", $users->create($previewUser, $previewKey));
+
+$store = new Datastore();
+$previewIndex = $store->loadIndex($previewUser, $previewKey);
+$ingested = (new VideoIngest())->ingest(
+    $previewUser, $previewKey, $fixture, 'preview-probe.mp4', $previewIndex,
+);
+$previewIndex['videos'][] = $ingested;
+$store->saveIndex($previewUser, $previewKey, $previewIndex);
+
+$videoId = (string) $ingested['id'];
+$previewArchive = Datastore::videoDir($previewUser, $videoId) . "/{$videoId}.jpg.preview.enc";
+
+step('the upload produced a preview archive', is_file($previewArchive));
+
+// The bytes to compare every later assertion against.
+$archiveHash = static fn(): string => (string) hash_file('sha256', $previewArchive);
+$originalHash = $archiveHash();
+
+$preview = new VideoPreview();
+
+// --- a frame from a different point in the video ---
+$moved = $preview->fromTimestamp($previewUser, $previewKey, $videoId, 3.0);
+step('a frame can be taken from a different timestamp (' . $moved['message'] . ')', $moved['ok'] === true);
+step('...and the stored preview actually changed', $archiveHash() !== $originalHash);
+
+$afterTimestamp = $archiveHash();
+
+$movedMeta = $store->loadVideoMetadata($previewUser, $previewKey, $videoId);
+step('...and the metadata records where it came from',
+    (int) round((float) $movedMeta['preview_capture_seconds']) === 3);
+
+// The archive must still open and hold a real JPEG, not merely be a different
+// size — replace() verifies its own work, but this proves it end to end.
+$previewOut = Datastore::tmpfsWorkDir('smokeprev');
+step('the new preview archive still decrypts',
+    (new Crypto7z())->extract($previewArchive, $previewOut, $previewKey));
+$extractedPreview = glob("{$previewOut}/*")[0] ?? null;
+step('...to something that is really an image',
+    $extractedPreview !== null && @getimagesize($extractedPreview) !== false);
+Datastore::wipe($previewOut);
+
+// --- a picture of the user's own ---
+//
+// Built here rather than read from dev/playwright: that directory is not
+// mounted into the container, so a fixture path there silently skips the whole
+// block — which is exactly what it did the first time this was written. A PNG
+// is made on the spot so the "stored as JPEG whatever was uploaded" assertion
+// below is testing a real format conversion.
+$ownDir = Datastore::tmpfsWorkDir('smokeprev');
+$ownPicture = "{$ownDir}/supplied.png";
+step('built a PNG to stand in for a user-supplied picture',
+    (new VideoEncoder())->extractFrame($fixture, $ownPicture, 1.0) && is_file($ownPicture));
+step('...and it really is a PNG', (@getimagesize($ownPicture)[2] ?? 0) === IMAGETYPE_PNG);
+
+{
+    $supplied = $preview->fromUpload($previewUser, $previewKey, $videoId, $ownPicture);
+    step('a supplied picture can replace the preview (' . $supplied['message'] . ')', $supplied['ok'] === true);
+    step('...and the stored preview changed again', $archiveHash() !== $afterTimestamp);
+
+    // A PNG went in; a JPEG must come out, because the archive is named
+    // .jpg.preview.enc and media.php serves it as image/jpeg.
+    $suppliedOut = Datastore::tmpfsWorkDir('smokeprev');
+    (new Crypto7z())->extract($previewArchive, $suppliedOut, $previewKey);
+    $suppliedFile = glob("{$suppliedOut}/*")[0] ?? null;
+    $info = $suppliedFile !== null ? @getimagesize($suppliedFile) : false;
+    step('...stored as a JPEG whatever was uploaded (' . ($info[2] ?? 0) . ' = IMAGETYPE_JPEG)',
+        $info !== false && $info[2] === IMAGETYPE_JPEG);
+    step('...capped at ' . VideoPreview::MAX_EDGE . 'px on the longest edge',
+        $info !== false && max($info[0], $info[1]) <= VideoPreview::MAX_EDGE);
+    Datastore::wipe($suppliedOut);
+
+    $suppliedMeta = $store->loadVideoMetadata($previewUser, $previewKey, $videoId);
+    step('...and the capture point is cleared, not left lying about the source',
+        $suppliedMeta['preview_capture_seconds'] === null);
+}
+Datastore::wipe($ownDir);
+
+$beforeRefusals = $archiveHash();
+
+// --- every refusal must leave the picture exactly as it was ---
+$notAnImage = Datastore::tmpfsWorkDir('smokeprev') . '/notanimage.png';
+file_put_contents($notAnImage, 'this is definitely not a PNG');
+$refusedUpload = $preview->fromUpload($previewUser, $previewKey, $videoId, $notAnImage);
+step('a file that is not an image is refused (' . $refusedUpload['message'] . ')',
+    $refusedUpload['ok'] === false);
+step('...and the previous preview is byte-for-byte intact', $archiveHash() === $beforeRefusals);
+Datastore::wipe(dirname($notAnImage));
+
+$pastEnd = $preview->fromTimestamp($previewUser, $previewKey, $videoId, 99999.0);
+step('a timestamp past the end of the video is refused (' . $pastEnd['message'] . ')',
+    $pastEnd['ok'] === false);
+step('...and the previous preview is still intact', $archiveHash() === $beforeRefusals);
+
+$negative = $preview->fromTimestamp($previewUser, $previewKey, $videoId, -5.0);
+step('a negative timestamp is refused', $negative['ok'] === false);
+step('...and the previous preview is still intact', $archiveHash() === $beforeRefusals);
+
+$wrongKey = $preview->fromTimestamp($previewUser, 'not-the-password-aaaaaaaaaaaa', $videoId, 1.0);
+step('a wrong password cannot re-preview', $wrongKey['ok'] === false);
+step('...and the previous preview is still intact', $archiveHash() === $beforeRefusals);
+
+$missing = $preview->fromTimestamp($previewUser, $previewKey, '9999', 1.0);
+step('a video that does not exist is refused (' . $missing['message'] . ')', $missing['ok'] === false);
+
+// --- a picture supplied at upload time (the other half of 3.9) ---
+//
+// Ingestion has its own path for this, separate from VideoPreview's, so it
+// needs its own proof rather than inheriting the assertions above.
+$atUploadDir = Datastore::tmpfsWorkDir('smokeprev');
+$atUploadPng = "{$atUploadDir}/supplied.png";
+(new VideoEncoder())->extractFrame($fixture, $atUploadPng, 2.0);
+
+$previewIndex = $store->loadIndex($previewUser, $previewKey);
+$withOwn = (new VideoIngest())->ingest(
+    $previewUser, $previewKey, $fixture, 'own-preview.mp4', $previewIndex,
+    30.0, $atUploadPng,
+);
+$ownId = (string) $withOwn['id'];
+$ownMeta = $store->loadVideoMetadata($previewUser, $previewKey, $ownId);
+step('a picture supplied at upload time is used instead of a frame',
+    $ownMeta['preview_capture_seconds'] === null);
+
+// The two ingests above deliberately do not save the index between them, which
+// makes nextVideoId() hand out the same id twice. The second must take the
+// next free one rather than encrypting over the first video's files.
+step('a second upload before the index is saved does not clobber the first',
+    $ownId !== $videoId && is_file(Datastore::videoDir($previewUser, $videoId) . "/{$videoId}.mp4.enc"));
+
+// An unreadable one must not fail the whole upload — the video has already
+// been transferred, and losing it over a thumbnail would be a poor trade.
+$junk = "{$atUploadDir}/junk.png";
+file_put_contents($junk, 'not an image');
+$previewIndex = $store->loadIndex($previewUser, $previewKey);
+$withJunk = (new VideoIngest())->ingest(
+    $previewUser, $previewKey, $fixture, 'junk-preview.mp4', $previewIndex,
+    5.0, $junk,
+);
+$junkId = (string) $withJunk['id'];
+$junkMeta = $store->loadVideoMetadata($previewUser, $previewKey, $junkId);
+step('an unreadable supplied picture falls back to the capture time, not a failed upload',
+    (int) round((float) $junkMeta['preview_capture_seconds']) === 5);
+step('...and that video still has a preview',
+    is_file(Datastore::videoDir($previewUser, $junkId) . "/{$junkId}.jpg.preview.enc"));
+Datastore::wipe($atUploadDir);
+
+// No litter from replace()'s write-verify-rotate.
+$dir = Datastore::videoDir($previewUser, $videoId);
+$litter = array_merge(glob("{$dir}/*.old") ?: [], glob("{$dir}/*.new") ?: []);
+step('no .old or .new copies left behind', $litter === []);
+
+Datastore::wipe(Datastore::userDir($previewUser));
+step('cleaned up', !is_dir(Datastore::userDir($previewUser)));
 
 echo PHP_EOL . "All smoke tests passed." . PHP_EOL;

@@ -1158,3 +1158,39 @@ select option {
   color: var(--text-muted);
   cursor: not-allowed;
 }
+
+/* ---------- Preview image editing (PLAN 3.9) ---------- */
+
+/* The current preview beside the two ways to change it, so the thing being
+   changed is visible while you change it. Stacks on a narrow window — at that
+   width a side-by-side leaves the controls too cramped to use. */
+.preview-edit {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.preview-current {
+  width: 280px;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.preview-forms {
+  flex: 1;
+  min-width: 280px;
+}
+
+/* Each way of setting the preview is its own form — they submit different
+   things — but they read as one group. */
+.preview-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  margin-bottom: 12px;
+}

@@ -7,12 +7,15 @@ require_once __DIR__ . '/../src/VideoCategories.php';
 require_once __DIR__ . '/../src/CreatorStore.php';
 require_once __DIR__ . '/../src/VideoCreators.php';
 require_once __DIR__ . '/../src/Jobs.php';
+require_once __DIR__ . '/../src/VideoPreview.php';
 
 use MyStash\CreatorStore;
+use MyStash\Datastore;
 use MyStash\Jobs;
 use MyStash\Session;
 use MyStash\VideoCategories;
 use MyStash\VideoCreators;
+use MyStash\VideoPreview;
 
 Session::requireLogin();
 
@@ -43,6 +46,14 @@ $converting = $convertJob !== null && $convertJob['state'] === Jobs::RUNNING;
 
 $editing = isset($_GET['edit']);
 $assignments = (new VideoCategories())->load(Session::user(), Session::password(), $id);
+
+// Where the current preview came from (3.9). Only read while editing: the
+// watch page does not need it, and this opens the per-video metadata archive.
+$previewCapture = null;
+if ($editing) {
+    $metadata = (new Datastore())->loadVideoMetadata(Session::user(), Session::password(), $id);
+    $previewCapture = $metadata['preview_capture_seconds'] ?? null;
+}
 
 $videoCreators = VideoCreators::of($video);
 
@@ -208,6 +219,71 @@ $navActive = 'videos';
             <a class="btn secondary" href="video.php?id=<?= urlencode($id) ?>">Cancel</a>
           </div>
         </form>
+      </div>
+
+      <?php /* 3.9 — the preview was chosen once at upload and then fixed for
+               good. If the frame landed on a fade or a blurred pan, the tile
+               wore it forever. Two ways out, because they answer different
+               problems: a better moment in the video, or a picture that is not
+               in the video at all. */ ?>
+      <div class="section-title">Preview Image</div>
+      <div class="card">
+        <?php if (isset($_GET['preview'])): ?>
+          <p class="hint" style="color:var(--accent); margin-top:0;">
+            <?= htmlspecialchars((string) $_GET['preview'], ENT_QUOTES) ?>
+          </p>
+        <?php elseif (isset($_GET['preview_error'])): ?>
+          <p class="hint" style="color:#ff6b6b; margin-top:0;">
+            <?= htmlspecialchars((string) $_GET['preview_error'], ENT_QUOTES) ?>
+          </p>
+        <?php endif; ?>
+
+        <div class="preview-edit">
+          <?php /* Cache-busted: the archive is replaced in place, so the URL
+                   does not change and the browser would keep showing the old
+                   one after a successful change. */ ?>
+          <img class="preview-current"
+               src="media.php?id=<?= urlencode($id) ?>&amp;type=thumb&amp;v=<?= urlencode((string) ($previewCapture ?? 'custom')) ?>"
+               alt="Current preview" onerror="this.style.display='none'">
+
+          <div class="preview-forms">
+            <p class="hint" style="margin-top:0;">
+              <?php if ($previewCapture === null): ?>
+                Currently a picture you supplied.
+              <?php else: ?>
+                Currently the frame at <?= htmlspecialchars(VideoPreview::formatTimestamp((float) $previewCapture), ENT_QUOTES) ?>.
+              <?php endif; ?>
+            </p>
+
+            <form action="video_preview.php" method="post" class="preview-row">
+              <input type="hidden" name="id" value="<?= htmlspecialchars($id, ENT_QUOTES) ?>">
+              <input type="hidden" name="source" value="timestamp">
+              <div class="field" style="margin-bottom:0; flex:1;">
+                <label for="preview-at">Take a frame from the video, at (seconds)</label>
+                <input type="number" id="preview-at" name="preview_at" min="0" step="1"
+                       max="<?= (int) $video['length_seconds'] ?>"
+                       value="<?= (int) ($previewCapture ?? 0) ?>" required>
+              </div>
+              <button type="submit" class="btn secondary">Capture</button>
+            </form>
+
+            <form action="video_preview.php" method="post" enctype="multipart/form-data" class="preview-row">
+              <input type="hidden" name="id" value="<?= htmlspecialchars($id, ENT_QUOTES) ?>">
+              <input type="hidden" name="source" value="upload">
+              <div class="field" style="margin-bottom:0; flex:1;">
+                <label for="preview-file">…or use your own picture</label>
+                <input type="file" id="preview-file" name="preview_image" accept="image/*" required>
+              </div>
+              <button type="submit" class="btn secondary">Upload</button>
+            </form>
+
+            <p class="hint" style="margin-bottom:0;">
+              Whatever you upload is re-encoded to JPEG and scaled to fit 1280px,
+              then encrypted like everything else. Taking a frame has to decrypt
+              the video first, so it takes a moment on a long one.
+            </p>
+          </div>
+        </div>
       </div>
 
       <div class="section-title">Categories</div>
