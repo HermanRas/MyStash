@@ -16,6 +16,7 @@ use MyStash\Rekey;
 use MyStash\Crypto7z;
 use MyStash\User;
 use MyStash\VideoEncoder;
+use MyStash\VideoCreators;
 use MyStash\VideoQuality;
 use MyStash\VideoQuery;
 
@@ -289,6 +290,78 @@ step('an array q is ignored on the creator search',
     CreatorQuery::fromRequest(['q' => ['x']])->search === '');
 step('a creator search counts as filtered',
     CreatorQuery::fromRequest(['q' => 'x'])->isFiltered() && !CreatorQuery::fromRequest([])->isFiltered());
+
+// Creator view counts (Docs/PLAN.md 4.11). $library credits Jamie on video 1
+// (0 views), Alex on videos 2 and 3 (3 + 9), and default on video 2 (3).
+$creatorViews = static fn(string $name): int => VideoCreators::viewCount(['videos' => $library], $name);
+
+step('a creator\'s views are the sum of their videos\' views', $creatorViews('Alex R.') === 12);
+step('a co-credited video counts in full for each creator', $creatorViews('default') === 3);
+step('an unwatched creator has no views', $creatorViews('Jamie K.') === 0);
+step('a creator with no videos has no views', $creatorViews('Morgan P.') === 0);
+step('view counts read legacy single-creator entries',
+    VideoCreators::viewCount(['videos' => [['creator' => 'Morgan P.', 'views' => 4]]], 'Morgan P.') === 4);
+
+// The same view counts drive the Creators screen's views sort.
+$viewSort = static fn(string $sort): array => array_keys(
+    CreatorQuery::fromRequest(['sort' => $sort])->apply($people, $library),
+);
+step('creators sort by views, max→min',
+    $viewSort('views_desc') === ['Alex R.', 'default', 'Jamie K.', 'Morgan P.']);
+step('creators sort by views, min→max, ties broken by name',
+    $viewSort('views_asc') === ['Jamie K.', 'Morgan P.', 'default', 'Alex R.']);
+
+// Creator age/gender filters on the wall (Docs/PLAN.md 5.2). These are
+// attributes of the *creator*, so the video list alone cannot answer them —
+// $people is passed alongside.
+$byCreator = static fn(array $params): array => array_column(
+    VideoQuery::fromRequest($params)->apply($library, $people),
+    'id',
+);
+
+step('an untouched age slider filters nothing', count($byCreator([])) === 3);
+step('a minimum age keeps only videos credited to someone that old',
+    $byCreator(['age_min' => 30]) === ['3', '2']);
+step('a maximum age keeps only videos credited to someone that young',
+    $byCreator(['age_max' => 25]) === ['1']);
+step('an age range excludes everyone outside it',
+    $byCreator(['age_min' => 26, 'age_max' => 29]) === []);
+step('a gender filter matches a creator\'s gender',
+    $byCreator(['gender' => 'Female']) === ['1']);
+step('a gender filter is case-insensitive',
+    $byCreator(['gender' => 'non-binary']) === ['3', '2']);
+step('a gender nobody\'s videos carry matches nothing',
+    $byCreator(['gender' => 'Male']) === []);
+
+// A video credited to several people matches if *any* of them does: video 2 is
+// Alex (31) and default (no age), and an age filter must not rule it out on
+// default's account.
+step('one matching creator is enough on a co-credited video',
+    in_array('2', $byCreator(['age_min' => 30]), true));
+
+// ...but an unrecorded age is not evidence of being in the range asked for.
+step('a creator with no age set fails an active age filter',
+    array_column(VideoQuery::fromRequest(['age_min' => 19])->apply(
+        [['id' => '9', 'title' => 'x', 'creators' => ['default'], 'categories' => [], 'length_seconds' => 5, 'views' => 0]],
+        $people,
+    ), 'id') === []);
+
+step('age and gender compose with the other filters',
+    $byCreator(['age_min' => 30, 'category' => ['Outdoors']]) === ['3']);
+
+step('an age filter counts as a filter',
+    VideoQuery::fromRequest(['age_min' => 25])->isFiltered()
+        && VideoQuery::fromRequest(['gender' => 'Female'])->isFiltered()
+        && !VideoQuery::fromRequest(['age_min' => VideoQuery::MIN_AGE, 'age_max' => VideoQuery::MAX_AGE])->isFiltered());
+
+$ages = VideoQuery::fromRequest(['age_min' => 40, 'age_max' => 20]);
+step('an upside-down age range is corrected rather than matching nothing',
+    $ages->minAge === 40 && $ages->maxAge === 40);
+step('an out-of-range age is clamped to the slider',
+    VideoQuery::fromRequest(['age_min' => 3, 'age_max' => 900])->minAge === VideoQuery::MIN_AGE
+        && VideoQuery::fromRequest(['age_min' => 3, 'age_max' => 900])->maxAge === VideoQuery::MAX_AGE);
+step('an array gender is ignored rather than filtered for "Array"',
+    VideoQuery::fromRequest(['gender' => ['x']])->gender === '');
 
 // Password change / re-keying (Docs/PLAN.md 6.1). Runs against a throwaway
 // stash of its own — never the caller's — and removes it again at the end.

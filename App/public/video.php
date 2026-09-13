@@ -83,7 +83,9 @@ $navActive = 'videos';
     <?php endif; ?>
 
     <div class="watch-meta">
-      <span id="view-count"><?= (int) $video['views'] ?></span> views • <?= formatLength((int) $video['length_seconds']) ?>
+      <span id="view-count"><?= (int) $video['views'] ?></span>
+      <span id="view-label">view<?= (int) $video['views'] === 1 ? '' : 's' ?></span>
+      • <?= formatLength((int) $video['length_seconds']) ?>
       <?php if (!empty($video['quality'])): ?> • <?= htmlspecialchars($video['quality'], ENT_QUOTES) ?><?php endif; ?>
       <?php if (!empty($video['not_converted'])): ?>
         • <span style="color:#cc4444;">Not Converted</span>
@@ -237,7 +239,11 @@ $navActive = 'videos';
       body: new URLSearchParams({ id: <?= json_encode($id) ?> }),
     })
       .then((response) => response.ok ? response.json() : null)
-      .then((data) => { if (data) document.getElementById('view-count').textContent = data.views; })
+      .then((data) => {
+        if (!data) return;
+        document.getElementById('view-count').textContent = data.views;
+        document.getElementById('view-label').textContent = data.views === 1 ? 'view' : 'views';
+      })
       .catch(() => {});
   }
 

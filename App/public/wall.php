@@ -17,8 +17,20 @@ $categories = $index['categories'] ?? [];
 $creators = $index['creators'] ?? [];
 
 $query = VideoQuery::fromRequest($_GET);
-$videos = $query->apply($index['videos'] ?? []);
+$videos = $query->apply($index['videos'] ?? [], $creators);
 $total = count($index['videos'] ?? []);
+
+// Gender is a free-text field on the creator form, so the filter offers the
+// values actually in use rather than a fixed list that might match nobody.
+// Compared case-insensitively, but offered with the spelling the user typed.
+$genders = [];
+foreach ($creators as $creator) {
+    $gender = trim((string) ($creator['gender'] ?? ''));
+    if ($gender !== '' && !isset($genders[mb_strtolower($gender)])) {
+        $genders[mb_strtolower($gender)] = $gender;
+    }
+}
+ksort($genders);
 
 function formatLength(int $seconds): string
 {
@@ -108,7 +120,7 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
         </div>
       </details>
 
-      <details class="filter-section" <?= $query->creators !== [] ? 'open' : '' ?>>
+      <details class="filter-section" <?= $query->creators !== [] || $query->filtersByCreatorAttributes() ? 'open' : '' ?>>
         <summary>Creators</summary>
         <?php foreach (array_keys($creators) as $name): ?>
           <div class="filter-row">
@@ -120,22 +132,33 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
           </div>
         <?php endforeach; ?>
 
+        <?php /* Age and gender belong to the creator, not the video: a video
+                 matches when any one of the people credited on it does. */ ?>
         <div class="filter-row">
-          <label>Age at least <output id="age-min-out">18</output></label>
-          <input type="range" id="age-min" min="18" max="80" step="1" value="18">
+          <label>Age at least <output id="age-min-out"><?= $query->minAge ?></output></label>
+          <input type="range" id="age-min" name="age_min" min="<?= VideoQuery::MIN_AGE ?>" max="<?= VideoQuery::MAX_AGE ?>" step="1" value="<?= $query->minAge ?>">
         </div>
         <div class="filter-row">
-          <label>Age at most <output id="age-max-out">80</output></label>
-          <input type="range" id="age-max" min="18" max="80" step="1" value="80">
+          <label>Age at most <output id="age-max-out"><?= $query->maxAge ?></output></label>
+          <input type="range" id="age-max" name="age_max" min="<?= VideoQuery::MIN_AGE ?>" max="<?= VideoQuery::MAX_AGE ?>" step="1" value="<?= $query->maxAge ?>">
         </div>
         <div class="filter-row">
-          <label>Gender</label>
-          <select>
-            <option value="">Any</option>
-            <option>Female</option>
-            <option>Male</option>
-            <option>Non-binary</option>
-          </select>
+          <label for="gender">Gender</label>
+          <?php if ($genders === [] && $query->gender === ''): ?>
+            <p class="hint" style="margin:0;">No creator has a gender set.</p>
+          <?php else: ?>
+            <select id="gender" name="gender">
+              <option value="">Any</option>
+              <?php /* Keep an unknown value from the URL selectable, so the
+                       filter doesn't silently reset to Any. */ ?>
+              <?php foreach (array_unique(array_merge(array_values($genders), $query->gender === '' ? [] : [$query->gender])) as $gender): ?>
+                <option value="<?= htmlspecialchars($gender, ENT_QUOTES) ?>"
+                        <?= strcasecmp($gender, $query->gender) === 0 ? 'selected' : '' ?>>
+                  <?= htmlspecialchars($gender, ENT_QUOTES) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          <?php endif; ?>
         </div>
       </details>
 
@@ -153,7 +176,7 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
         <?php if ($query->search !== ''): ?>
           matching <strong class="wall-term"><?= htmlspecialchars($query->search, ENT_QUOTES) ?></strong><?php
             /* The filter panel may be narrowing the search further. */
-            ?><?= $query->categories !== [] || $query->creators !== [] || $query->minMinutes > 0 || $query->maxMinutes < VideoQuery::MAX_LENGTH_MINUTES ? ', filtered' : '' ?>
+            ?><?= $query->categories !== [] || $query->creators !== [] || $query->minMinutes > 0 || $query->maxMinutes < VideoQuery::MAX_LENGTH_MINUTES || $query->filtersByCreatorAttributes() ? ', filtered' : '' ?>
         <?php elseif ($query->isFiltered()): ?>
           (filtered)
         <?php endif; ?>
@@ -167,6 +190,9 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
         <?php endforeach; ?>
         <input type="hidden" name="len_min" value="<?= $query->minMinutes ?>">
         <input type="hidden" name="len_max" value="<?= $query->maxMinutes ?>">
+        <input type="hidden" name="age_min" value="<?= $query->minAge ?>">
+        <input type="hidden" name="age_max" value="<?= $query->maxAge ?>">
+        <input type="hidden" name="gender" value="<?= htmlspecialchars($query->gender, ENT_QUOTES) ?>">
         <input type="hidden" name="q" value="<?= htmlspecialchars($query->search, ENT_QUOTES) ?>">
         <label for="sort"><img class="btn-icon" src="assets/img/icons/<?= $sortIcon ?>.png" alt="">Sort</label>
         <select id="sort" name="sort" onchange="this.form.submit()">
@@ -196,7 +222,7 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
           <div class="tile-title"><?= htmlspecialchars($video['title'], ENT_QUOTES) ?></div>
           <div class="tile-creator"><?= htmlspecialchars(VideoCreators::label($video), ENT_QUOTES) ?></div>
           <div class="tile-stats">
-            <?= formatLength((int) $video['length_seconds']) ?> • <?= (int) $video['views'] ?> views<?php
+            <?= formatLength((int) $video['length_seconds']) ?> • <?= (int) $video['views'] ?> view<?= (int) $video['views'] === 1 ? '' : 's' ?><?php
               if (!empty($video['categories'])): ?> • <?= htmlspecialchars(implode(', ', $video['categories']), ENT_QUOTES) ?><?php endif; ?>
           </div>
         </a>
@@ -244,11 +270,16 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
   });
 
   const maxMinutes = <?= VideoQuery::MAX_LENGTH_MINUTES ?>;
+  const maxAge = <?= VideoQuery::MAX_AGE ?>;
   document.querySelectorAll('.filter-panel input[type="range"]').forEach((input) => {
     const output = document.getElementById(input.id + '-out');
     const isAge = input.id.startsWith('age');
-    // The top of the length slider is an open end, not a hard ceiling.
-    const format = (v) => isAge ? v : (Number(v) >= maxMinutes ? 'any' : `${v}m`);
+    // The top of either slider is an open end, not a hard ceiling: "180m" and
+    // "80" would both read as real limits when they mean "no upper limit".
+    const open = isAge ? maxAge : maxMinutes;
+    const format = (v) => Number(v) >= open && input.id.endsWith('max')
+      ? 'any'
+      : (isAge ? v : `${v}m`);
     output.textContent = format(input.value);
     input.addEventListener('input', () => {
       output.textContent = format(input.value);

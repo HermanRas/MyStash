@@ -60,7 +60,7 @@ const AVATAR = '/work/avatar_fixture.png';
 
   await sortBy('views_desc');
   const views = (await page.locator('.tile-stats').allInnerTexts())
-    .map(t => Number(t.match(/(\d+) views/)[1]));
+    .map(t => Number(t.match(/(\d+) views?/)[1]));
   check('views max→min is descending', views.every((v, i) => i === 0 || views[i - 1] >= v));
 
   console.log('  views:', views.join(' '));
@@ -81,10 +81,14 @@ const AVATAR = '/work/avatar_fixture.png';
   console.log('  filtered wall shows', filteredCount, 'video(s);', await page.locator('.wall-count').innerText());
   await page.screenshot({ path: '/work/screenshots/records_filtered.png' });
 
-  // Reset Filters returns the full wall.
-  await page.click('a.btn.secondary:has-text("Reset Filters")');
+  // The Reset Filters button was removed in 4.22 — the "All Videos" pill is
+  // the bare wall URL, which is the same thing, so that is what resets now.
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'networkidle' }),
+    page.click('.category-bar .pill:has-text("All Videos")'),
+  ]);
   await page.waitForSelector('.video-grid');
-  check('Reset Filters restores every video', (await page.locator('.video-card').count()) > filteredCount);
+  check('All Videos restores every video', (await page.locator('.video-card').count()) > filteredCount);
 
   // --- creator profile picture ------------------------------------------
   await page.goto(`${BASE}/creator.php?edit=${encodeURIComponent('Alex R.')}`, { waitUntil: 'networkidle' });

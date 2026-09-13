@@ -101,7 +101,32 @@ final class VideoCreators
      */
     public static function videoCount(array $index, string $name): int
     {
-        return count(array_filter(
+        return count(self::videosOf($index, $name));
+    }
+
+    /**
+     * How many times a creator's videos have been watched, in total
+     * (Docs/PLAN.md 4.11).
+     *
+     * A view is counted against the video, and a video may credit several
+     * people, so a co-credited video's views count in full for each of them.
+     * That is the honest reading of "this creator's work was watched N times";
+     * dividing the view between them would answer a question nobody asked.
+     */
+    public static function viewCount(array $index, string $name): int
+    {
+        return array_sum(array_map(
+            static fn(array $video) => (int) ($video['views'] ?? 0),
+            self::videosOf($index, $name),
+        ));
+    }
+
+    /**
+     * @return list<array> the index entries crediting this creator
+     */
+    private static function videosOf(array $index, string $name): array
+    {
+        return array_values(array_filter(
             $index['videos'] ?? [],
             static fn(array $video) => self::has($video, $name),
         ));

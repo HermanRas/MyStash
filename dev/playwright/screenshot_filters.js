@@ -75,7 +75,7 @@ const PASSWORD = process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg';
 
   await page.goto(`${BASE}/wall.php`, { waitUntil: 'networkidle' });
   check('the wall tile shows the new count',
-    (await page.locator('.tile-stats').first().innerText()).includes(`${after} views`));
+    new RegExp(`\\b${after} views?\\b`).test(await page.locator('.tile-stats').first().innerText()));
 
   const bad = await page.request.post(`${BASE}/video_view.php`, { form: { id: '../x' } });
   check(`a non-numeric id is rejected (${bad.status()})`, bad.status() === 400);

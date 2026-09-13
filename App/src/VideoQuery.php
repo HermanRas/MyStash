@@ -37,6 +37,14 @@ final class VideoQuery
     public const MAX_LENGTH_MINUTES = 180;
 
     /**
+     * Ends of the creator age slider. The bottom is 18 because that is the
+     * minimum the creator form accepts; the top is an open end like the length
+     * slider's, not an 80-year ceiling.
+     */
+    public const MIN_AGE = 18;
+    public const MAX_AGE = 80;
+
+    /**
      * Longest search term accepted. A search runs over the already-decrypted
      * index, so this is not about cost — it just stops a pathological URL from
      * being echoed back into the input.
@@ -52,6 +60,9 @@ final class VideoQuery
         public readonly array $creators,
         public readonly int $minMinutes,
         public readonly int $maxMinutes,
+        public readonly int $minAge,
+        public readonly int $maxAge,
+        public readonly string $gender,
         public readonly string $sort,
         public readonly string $search,
     ) {
@@ -71,6 +82,12 @@ final class VideoQuery
         $max = (int) ($query['len_max'] ?? self::MAX_LENGTH_MINUTES);
         $max = min(self::MAX_LENGTH_MINUTES, max($min, $max));
 
+        $minAge = max(self::MIN_AGE, (int) ($query['age_min'] ?? self::MIN_AGE));
+        $maxAge = (int) ($query['age_max'] ?? self::MAX_AGE);
+        $maxAge = min(self::MAX_AGE, max($minAge, $maxAge));
+
+        $gender = is_array($query['gender'] ?? null) ? '' : trim((string) ($query['gender'] ?? ''));
+
         $sort = (string) ($query['sort'] ?? self::DEFAULT_SORT);
         if (!isset(self::SORTS[$sort])) {
             $sort = self::DEFAULT_SORT;
@@ -80,7 +97,7 @@ final class VideoQuery
         $search = is_array($query['q'] ?? null) ? '' : (string) ($query['q'] ?? '');
         $search = mb_substr(trim(preg_replace('/\s+/u', ' ', $search) ?? ''), 0, self::MAX_SEARCH_LENGTH);
 
-        return new self($categories, $creators, $min, $max, $sort, $search);
+        return new self($categories, $creators, $min, $max, $minAge, $maxAge, $gender, $sort, $search);
     }
 
     public function isFiltered(): bool
@@ -89,7 +106,19 @@ final class VideoQuery
             || $this->creators !== []
             || $this->search !== ''
             || $this->minMinutes > 0
-            || $this->maxMinutes < self::MAX_LENGTH_MINUTES;
+            || $this->maxMinutes < self::MAX_LENGTH_MINUTES
+            || $this->filtersByCreatorAttributes();
+    }
+
+    /**
+     * True when the age slider has been moved off its ends or a gender picked —
+     * i.e. when the creator-attribute filter actually narrows anything.
+     */
+    public function filtersByCreatorAttributes(): bool
+    {
+        return $this->gender !== ''
+            || $this->minAge > self::MIN_AGE
+            || $this->maxAge < self::MAX_AGE;
     }
 
     /**
@@ -144,12 +173,70 @@ final class VideoQuery
     }
 
     /**
+     * True when a video is credited to at least one creator matching the age
+     * and gender filters (Docs/PLAN.md 5.2).
+     *
+     * "At least one" is the only sensible reading for a co-credited video: if
+     * you filter for a creator in her twenties, a video she made with someone
+     * older is still one of hers. A creator whose age or gender is simply not
+     * recorded does not match an active filter on that field — an unknown age
+     * is not evidence of being in the range you asked for.
+     *
+     * @param array<string, array> $creators name => index summary
+     */
+    public function matchesCreatorAttributes(array $video, array $creators): bool
+    {
+        if (!$this->filtersByCreatorAttributes()) {
+            return true;
+        }
+
+        foreach (VideoCreators::of($video) as $name) {
+            $creator = $creators[$name] ?? null;
+
+            if ($creator === null) {
+                continue;
+            }
+
+            if ($this->gender !== ''
+                && strcasecmp(trim((string) ($creator['gender'] ?? '')), $this->gender) !== 0) {
+                continue;
+            }
+
+            if ($this->minAge > self::MIN_AGE || $this->maxAge < self::MAX_AGE) {
+                $age = $creator['age'] ?? null;
+
+                if ($age === null || $age === '') {
+                    continue;
+                }
+
+                $age = (int) $age;
+
+                if ($age < $this->minAge) {
+                    continue;
+                }
+
+                // The top of the slider is an open end, not an 80-year ceiling.
+                if ($this->maxAge < self::MAX_AGE && $age > $this->maxAge) {
+                    continue;
+                }
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * @param list<array> $videos index entries
+     * @param array<string, array> $creators name => index summary, for the age
+     *        and gender filters; they are attributes of the creator, not of the
+     *        video, so the video list alone cannot answer them
      * @return list<array>
      */
-    public function apply(array $videos): array
+    public function apply(array $videos, array $creators = []): array
     {
-        $videos = array_values(array_filter($videos, function (array $video): bool {
+        $videos = array_values(array_filter($videos, function (array $video) use ($creators): bool {
             if (!$this->matchesSearch($video)) {
                 return false;
             }
@@ -167,6 +254,10 @@ final class VideoQuery
 
             if ($this->creators !== []
                 && array_intersect($this->creators, VideoCreators::of($video)) === []) {
+                return false;
+            }
+
+            if (!$this->matchesCreatorAttributes($video, $creators)) {
                 return false;
             }
 

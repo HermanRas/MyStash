@@ -54,7 +54,9 @@ const PASSWORD = process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg';
   await page.screenshot({ path: '/work/screenshots/ui_video.png', fullPage: true });
 
   await page.goto(`${BASE}/video.php?id=1&edit=1`, { waitUntil: 'networkidle' });
-  const bg = await page.locator('#v-creator').evaluate((e) => getComputedStyle(e).backgroundColor);
+  // The creator <select> this used to read became checkboxes in 4.23; the
+  // category one is the select left on this screen.
+  const bg = await page.locator('#cat-name').evaluate((e) => getComputedStyle(e).backgroundColor);
   check(`selects are themed dark (${bg})`, bg === 'rgb(42, 42, 42)');
   await page.screenshot({ path: '/work/screenshots/ui_video_edit.png', fullPage: true });
 

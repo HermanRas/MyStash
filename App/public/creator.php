@@ -35,6 +35,11 @@ function videoCount(array $videos, string $creatorName): int
     return VideoCreators::videoCount(['videos' => $videos], $creatorName);
 }
 
+function viewCount(array $videos, string $creatorName): int
+{
+    return VideoCreators::viewCount(['videos' => $videos], $creatorName);
+}
+
 function avatarUrl(array $creator): ?string
 {
     $id = (string) ($creator['id'] ?? '');
@@ -118,8 +123,10 @@ $headerActions = '<a class="icon-btn" href="creator.php?edit="><img class="btn-i
         <div class="creator-name">
           <?= htmlspecialchars($name, ENT_QUOTES) ?>
         </div>
+        <?php $tally = videoCount($videos, $name); $watched = viewCount($videos, $name); ?>
         <div class="creator-meta">
-          <?= videoCount($videos, $name) ?> video<?= videoCount($videos, $name) === 1 ? '' : 's' ?>
+          <?= $tally ?> video<?= $tally === 1 ? '' : 's' ?>
+          • <?= $watched ?> view<?= $watched === 1 ? '' : 's' ?>
           <?php if (!empty($creator['age'])): ?> • Age <?= (int) $creator['age'] ?><?php endif; ?>
         </div>
       </a>
@@ -136,6 +143,13 @@ $headerActions = '<a class="icon-btn" href="creator.php?edit="><img class="btn-i
   <?php if ($editing !== null): ?>
     <div class="section-title"><?= $editCreator ? 'Edit Creator' : 'Add Creator' ?></div>
     <div class="card" style="max-width:480px;">
+      <?php if ($editCreator): ?>
+        <?php $tally = videoCount($videos, $editing); $watched = viewCount($videos, $editing); ?>
+        <p class="hint" style="margin:0 0 14px;">
+          <?= $tally ?> video<?= $tally === 1 ? '' : 's' ?>,
+          watched <?= $watched ?> time<?= $watched === 1 ? '' : 's' ?> in total.
+        </p>
+      <?php endif; ?>
       <form id="creator-form" action="creator_save.php" method="post" enctype="multipart/form-data">
         <input type="hidden" name="original_name" value="<?= htmlspecialchars($editing, ENT_QUOTES) ?>">
         <div class="field">

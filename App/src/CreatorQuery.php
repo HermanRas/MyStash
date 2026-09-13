@@ -29,6 +29,8 @@ final class CreatorQuery
         'name_desc' => 'Name: Z → A',
         'videos_desc' => 'Videos: max → min',
         'videos_asc' => 'Videos: min → max',
+        'views_desc' => 'Views: max → min',
+        'views_asc' => 'Views: min → max',
         'age_asc' => 'Age: young → old',
         'age_desc' => 'Age: old → young',
     ];
@@ -116,11 +118,13 @@ final class CreatorQuery
         );
 
         $counts = [];
+        $views = [];
         foreach (array_keys($creators) as $name) {
             $counts[$name] = VideoCreators::videoCount(['videos' => $videos], $name);
+            $views[$name] = VideoCreators::viewCount(['videos' => $videos], $name);
         }
 
-        uksort($creators, function (string $a, string $b) use ($creators, $counts): int {
+        uksort($creators, function (string $a, string $b) use ($creators, $counts, $views): int {
             // A creator with no age set has nothing to sort on, so they sort
             // last either way rather than counting as age zero.
             $age = static function (string $name) use ($creators): ?int {
@@ -133,6 +137,8 @@ final class CreatorQuery
                 'name_desc' => strcasecmp($b, $a),
                 'videos_asc' => $counts[$a] <=> $counts[$b] ?: strcasecmp($a, $b),
                 'videos_desc' => $counts[$b] <=> $counts[$a] ?: strcasecmp($a, $b),
+                'views_asc' => $views[$a] <=> $views[$b] ?: strcasecmp($a, $b),
+                'views_desc' => $views[$b] <=> $views[$a] ?: strcasecmp($a, $b),
                 'age_asc', 'age_desc' => self::compareAges(
                     $age($a),
                     $age($b),
