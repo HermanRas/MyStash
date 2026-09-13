@@ -55,7 +55,9 @@ credited and the categories assigned.
 at upload time that samples frames across the whole video, so a hover skims
 what the video *is* rather than how it opens. The preview is decrypted on
 demand, plays muted on a 180ms debounce, and stops the moment the pointer
-leaves.
+leaves. The amber line under the tile tracks how far through it has got.
+
+![A tile previewing on hover](Docs/Assets/README/04_wall_hover.png)
 
 ---
 
@@ -292,6 +294,11 @@ dev/make_sample_clips.sh     # synthesises twelve clips, four resolutions
 dev/seed_sample_data.sh      # uploads them through the real endpoints
 dev/run_readme_shots.sh      # retakes every screenshot on this page
 ```
+
+Two of the screenshots are taken by hand: the hover preview and the playing
+video. The Chromium that ships with Playwright is built without H.264 and HEVC,
+so both are blank there and fine in a real browser — `run_readme_shots.sh`
+leaves those two files alone.
 
 The clips are generated rather than filmed, and the twelve videos, three
 creators, four categories and two playlists are a fixed list — so the wall

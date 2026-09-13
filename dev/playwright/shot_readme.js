@@ -6,12 +6,14 @@
 // Two things this cannot photograph, and they are worth stating rather than
 // silently skipping:
 //
-//  - **the hover preview.** The preview clips are H.264, and the Chromium that
-//    ships with Playwright is built without H.264 or HEVC — `canPlayType`
-//    returns "" for both, so the clip never starts here while playing fine in
-//    a real browser. The still would show a motionless frame in any case.
-//  - **playback of an HEVC video**, for the same reason. The watch page is
-//    photographed playing one of the VP9 clips, which that build does decode.
+//  - **the hover preview** (04_wall_hover.png);
+//  - **a video actually playing** (11_watch_playing.png).
+//
+// Both are H.264 or HEVC, and the Chromium that ships with Playwright is built
+// without either — `canPlayType` returns "" for both codecs, so the video
+// element errors here while playing perfectly in a real browser. Those two
+// files are captured by hand in Chrome and live in Docs/Assets/README only;
+// nothing below writes to those names, so re-running this leaves them alone.
 const { chromium } = require('playwright');
 const fs = require('fs');
 
@@ -24,7 +26,6 @@ const PASSWORD = process.env.PROBE_PASS || 'DS89HONPtufGDncNUoGfshCg';
 // these three shots need particular videos: one that plays in this browser,
 // one still tagged Not Converted, and one big enough that converting it is
 // still running when the screenshot is taken.
-const PLAYABLE = process.env.PLAYABLE_ID || '6';     // 720p VP9
 const UNCONVERTED = process.env.UNCONVERTED_ID || '3'; // 480p H.264
 const CONVERTIBLE = process.env.CONVERTIBLE_ID || '12'; // 4K VP9
 
@@ -91,17 +92,6 @@ const shot = async (page, name, opts = {}) => {
   await page.goto(`${BASE}/video.php?id=${CONVERTIBLE}`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(900);
   await shot(page, '10_watch');
-
-  // Pressing play is also the proof that the video really decrypts and
-  // streams — the source is only attached to the element at that point.
-  await page.goto(`${BASE}/video.php?id=${PLAYABLE}`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(600);
-  await page.click('#player-play');
-  await page.waitForFunction(() => {
-    const v = document.querySelector('#player video');
-    return v && !v.paused && v.currentTime > 1.5;
-  }, null, { timeout: 30000 }).catch(() => console.log('  (playback did not start)'));
-  await shot(page, '11_watch_playing');
 
   await page.goto(`${BASE}/video.php?id=${CONVERTIBLE}&edit=1`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(700);
