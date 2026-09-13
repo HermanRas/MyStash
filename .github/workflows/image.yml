@@ -56,10 +56,24 @@ jobs:
           # the runner, which is the one place those two have to agree.
           mkdir -p App/Data && chmod 777 App/Data
           docker compose up -d --no-build
-          for i in $(seq 1 30); do
-            curl -sf -o /dev/null http://localhost:8080/login.html && break
+
+          # Wait on `/`, not on a static file. A static file proves nginx is
+          # listening and nothing more — php-fpm can still be starting behind
+          # it, and every PHP request in that window is a 502. Waiting on the
+          # redirect waits on both processes, which is the thing being tested.
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/ || true)
+            [ "$code" = 302 ] && echo "ready after ${i}s" && exit 0
+            # A container that has exited is never going to become ready, and
+            # the reason is in its log rather than in another 59 seconds.
+            [ "$(docker inspect -f '{{.State.Running}}' "$(docker compose ps -aq app)")" = false ] && break
             sleep 1
           done
+
+          echo "::error::the stack never served a PHP request (last status ${code:-none})"
+          docker compose ps -a
+          docker compose logs app
+          exit 1
 
       - name: It serves the app
         run: |

@@ -291,6 +291,10 @@ the parts curl cannot reach, a real browser in a Playwright container:
 | `run_layout_check.sh` | the management screens share the watch page's column |
 | `run_font_check.sh` | nothing on the site is fetched from another host |
 
+`dev/push_image.sh` builds the container here, runs the same verification CI
+does, and pushes it to GHCR — for when the thing that is broken is CI itself.
+It needs `docker login ghcr.io` first.
+
 To fill a development stash with the library shown in these screenshots:
 
 ```bash

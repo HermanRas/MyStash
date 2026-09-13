@@ -73,6 +73,11 @@ MYSTASH_TAG=sha-$(git rev-parse HEAD) docker compose \
   -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
+If CI is the thing that is broken, `dev/push_image.sh` builds the container on
+your machine, runs the same verification, and pushes both tags — after
+`echo "$GITHUB_TOKEN" | docker login ghcr.io -u HermanRas --password-stdin`
+with a token that has `write:packages`. Nothing is pushed if a check fails.
+
 Running an image you did not build is a real thing to weigh: you are trusting
 GitHub's builder and the commit it built from, rather than a working tree you
 can read. `sha-` tags exist so you can at least name exactly which commit is
