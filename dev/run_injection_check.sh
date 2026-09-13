@@ -12,6 +12,10 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
+# shellcheck source=dev/fixture.sh
+. "$(dirname "$0")/fixture.sh"
+ensure_fixture || { echo "could not build the upload fixture"; exit 1; }
+
 PROBE="InjProbe$(openssl rand -hex 3)"
 # Every shell metacharacter that matters, and long enough for 7.0.1's minimum.
 PASS='inj$(touch /tmp/c-pw)`touch /tmp/c-bt`;|&<>"'"'"' --zz'
@@ -60,7 +64,7 @@ WALL=$(curl -s -b "$JAR" -o /dev/null -w '%{http_code}' http://localhost:8080/wa
 [ "$WALL" = "200" ]; check "...and it logs back in, so the password was stored verbatim (HTTP ${WALL})" $?
 
 # --- upload with a hostile filename through the real form ----------------
-cp App/Data/TestUser/videos/1.mp4 "/tmp/${PROBE}.mp4"
+cp "$FIXTURE" "/tmp/${PROBE}.mp4"
 UP=$(curl -s -b "$JAR" -o /dev/null -w '%{http_code}' \
   -F 'video=@/tmp/'"${PROBE}"'.mp4;filename=evil$(touch /tmp/c-fn)`touch /tmp/c-up`;id.mp4' \
   http://localhost:8080/upload.php)
@@ -75,7 +79,7 @@ done
 # --- preview_at, which upload.php casts straight from the form -----------
 # 7.2.1: a timestamp past the end used to lose the whole upload and leave an
 # unreachable directory behind.
-cp App/Data/TestUser/videos/1.mp4 "/tmp/${PROBE}.mp4"
+cp "$FIXTURE" "/tmp/${PROBE}.mp4"
 curl -s -b "$JAR" -o /dev/null \
   -F "video=@/tmp/${PROBE}.mp4;filename=far.mp4" -F "preview_at=999999" \
   http://localhost:8080/upload.php

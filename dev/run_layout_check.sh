@@ -8,6 +8,10 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
+# shellcheck source=dev/fixture.sh
+. "$(dirname "$0")/fixture.sh"
+ensure_fixture || { echo "could not build the upload fixture"; exit 1; }
+
 PROBE="LayProbe$(openssl rand -hex 3)"
 PASS="probe-layout-password-aaaaaaaa"
 JAR="/tmp/${PROBE}.cookies"
@@ -46,7 +50,12 @@ $u = getenv("U"); $p = getenv("P");
 if (!(new MyStash\User())->create($u, $p)) { fwrite(STDERR, "create failed\n"); exit(1); }
 $store = new MyStash\Datastore();
 $index = $store->loadIndex($u, $p);
-copy("/app/Data/TestUser/videos/1.mp4", "/dev/shm/layout-src.mov");
+// Not the shared fixture: this check needs a conversion that is still
+// running when the browser looks at the page, and the fixture converts in
+// about a second. Half a minute of 720p is still being converted when the
+// browser looks, without making the cleanup wait minutes for the worker.
+exec("ffmpeg -v error -y -f lavfi -i testsrc=size=1280x720:rate=30:duration=30 "
+   . "-c:v libx264 -preset ultrafast -pix_fmt yuv420p /dev/shm/layout-src.mov");
 $entry = (new MyStash\VideoIngest())->ingest($u, $p, "/dev/shm/layout-src.mov", "probe.mov", $index);
 $index["videos"][] = $entry;
 $store->saveIndex($u, $p, $index);

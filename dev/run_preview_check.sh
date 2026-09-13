@@ -6,6 +6,10 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
+# shellcheck source=dev/fixture.sh
+. "$(dirname "$0")/fixture.sh"
+ensure_fixture || { echo "could not build the upload fixture"; exit 1; }
+
 PROBE="PrevProbe$(openssl rand -hex 3)"
 PASS="probe-preview-password-aaaaaaaa"
 fails=0
@@ -31,7 +35,7 @@ if (!(new MyStash\User())->create($u, $p)) { fwrite(STDERR, "create failed\n"); 
 $store = new MyStash\Datastore();
 $index = $store->loadIndex($u, $p);
 $entry = (new MyStash\VideoIngest())->ingest(
-    $u, $p, "/app/Data/TestUser/videos/1.mp4", "preview-probe.mp4", $index);
+    $u, $p, "/app/tests/fixture.mp4", "preview-probe.mp4", $index);
 $index["videos"][] = $entry;
 $store->saveIndex($u, $p, $index);
 echo "ingested video {$entry["id"]}\n";

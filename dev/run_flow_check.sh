@@ -18,6 +18,10 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
+# shellcheck source=dev/fixture.sh
+. "$(dirname "$0")/fixture.sh"
+ensure_fixture || { echo "could not build the upload fixture"; exit 1; }
+
 PROBE="FlowProbe$(openssl rand -hex 3)"
 PASS="probe-flow-password-aaaaaaaaaaa"     # 32 chars, comfortably over the §2.1 floor
 JAR="/tmp/${PROBE}.cookies"
@@ -43,7 +47,7 @@ post() { curl -s -b "$JAR" -c "$JAR" -o "$1" -w '%{http_code} %{redirect_url}' "
 # A .mov, so §2.3 step 2 ("not MP4/H.265 ⇒ tagged not converted") has something
 # to bite on. Same bytes as the fixture; only the container name differs, which
 # is exactly what the derived tag is meant to notice.
-cp App/Data/TestUser/videos/1.mp4 "$SRC"
+cp "$FIXTURE" "$SRC"
 
 echo "--- §2.1 Registration ---"
 

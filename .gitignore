@@ -1,3 +1,5 @@
 App/Data/
 dev/playwright/screenshots/
 dev/playwright/.pwlib/
+App/tests/fixture.mp4
+dev/sample/

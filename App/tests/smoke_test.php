@@ -38,10 +38,28 @@ function step(string $label, bool $ok): void
     }
 }
 
-$fixture = __DIR__ . '/../Data/TestUser/videos/1.mp4';
+// The suite needs one real video to encrypt, probe, convert and ingest. It
+// used to require a file checked in under a user's stash directory, which meant
+// the whole suite failed on a fresh clone — and stopped working the moment that
+// stash was cleared. It is synthesised instead, in tmpfs, and thrown away with
+// the rest of the work directory.
+//
+// 20 seconds and 640x360 on purpose: long enough for the 15s preview frame the
+// suite asks for, and small enough that generating it costs about a second.
+$fixture = '/dev/shm/mystash-smoke-fixture.mp4';
+
 if (!file_exists($fixture)) {
-    fwrite(STDERR, "Fixture not found: {$fixture}\n");
-    exit(1);
+    exec(sprintf(
+        'ffmpeg -v error -y -f lavfi -i testsrc=size=640x360:rate=25:duration=20 '
+        . '-f lavfi -i sine=frequency=440:duration=20 '
+        . '-c:v libx264 -preset veryfast -c:a aac -pix_fmt yuv420p -shortest %s',
+        escapeshellarg($fixture),
+    ), $output, $status);
+
+    if ($status !== 0 || !file_exists($fixture)) {
+        fwrite(STDERR, "Could not synthesise the test fixture — is ffmpeg present?\n");
+        exit(1);
+    }
 }
 
 $workDir = sys_get_temp_dir() . '/mystash_smoke_' . uniqid();

@@ -9,6 +9,10 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
+# shellcheck source=dev/fixture.sh
+. "$(dirname "$0")/fixture.sh"
+ensure_fixture || { echo "could not build the upload fixture"; exit 1; }
+
 PROBE="ConvProbe$(openssl rand -hex 3)"
 PASS="probe-convert-password-aaaaaaaa"
 JAR="/tmp/${PROBE}.cookies"
@@ -46,7 +50,7 @@ $store = new MyStash\Datastore();
 $index = $store->loadIndex($u, $p);
 // A .mov container makes it "Not Converted" whatever its codec, so the
 // convert button has real work to do.
-copy("/app/Data/TestUser/videos/1.mp4", "/dev/shm/probe-src.mov");
+copy("/app/tests/fixture.mp4", "/dev/shm/probe-src.mov");
 $entry = (new MyStash\VideoIngest())->ingest($u, $p, "/dev/shm/probe-src.mov", "probe.mov", $index);
 $index["videos"][] = $entry;
 $store->saveIndex($u, $p, $index);

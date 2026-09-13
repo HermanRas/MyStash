@@ -11,6 +11,10 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
+# shellcheck source=dev/fixture.sh
+. "$(dirname "$0")/fixture.sh"
+ensure_fixture || { echo "could not build the upload fixture"; exit 1; }
+
 ATK="IsoAtk$(openssl rand -hex 3)"
 VIC="IsoVic$(openssl rand -hex 3)"
 PW="isolation-probe-password-aaaaaaaa"
@@ -36,7 +40,7 @@ mkstash() { # name password
   curl -s -c "/tmp/$1.jar" -o /dev/null \
     --data-urlencode "username=$1" --data-urlencode "password=$2" \
     --data-urlencode "confirm_password=$2" http://localhost:8080/register.php
-  cp App/Data/TestUser/videos/1.mp4 "/tmp/$1.mp4"
+  cp "$FIXTURE" "/tmp/$1.mp4"
   curl -s -b "/tmp/$1.jar" -o /dev/null \
     -F "video=@/tmp/$1.mp4;filename=v.mp4" http://localhost:8080/upload.php
 }
