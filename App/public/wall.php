@@ -69,9 +69,13 @@ $searchTerm = $query->search;
 $headerActions = '<button class="icon-btn square" id="upload-toggle" title="Upload" aria-label="Upload"'
     . ' aria-expanded="false" aria-controls="upload-panel">'
     . '<img class="btn-icon" src="assets/img/icons/upload.png" alt=""></button>'
-    . '<button class="icon-btn square" id="filters-toggle" title="Filters" aria-label="Filters"'
+    /* A funnel names the button; the chevron that used to sit here named the
+       gesture instead, and said "Filters" nowhere. The open/closed state it
+       used to carry moves onto the button itself, which lights up amber while
+       the panel is showing. */
+    . '<button class="icon-btn square active" id="filters-toggle" title="Filters" aria-label="Filters"'
     . ' aria-expanded="true" aria-controls="filter-panel">'
-    . '<img class="btn-icon" id="filters-chevron" src="assets/img/icons/chevron-up.png" alt=""></button>';
+    . '<img class="btn-icon" src="assets/img/icons/filter.png" alt=""></button>';
 ?>
 <!doctype html>
 <html lang="en">
@@ -276,11 +280,10 @@ $headerActions = '<button class="icon-btn square" id="upload-toggle" title="Uplo
 <script>
   const toggle = document.getElementById('filters-toggle');
   const panel = document.getElementById('filter-panel');
-  const chevron = document.getElementById('filters-chevron');
   toggle.addEventListener('click', () => {
     const isClosed = panel.classList.toggle('closed');
     toggle.setAttribute('aria-expanded', String(!isClosed));
-    chevron.src = `assets/img/icons/chevron-${isClosed ? 'down' : 'up'}.png`;
+    toggle.classList.toggle('active', !isClosed);
   });
 
   const uploadToggle = document.getElementById('upload-toggle');

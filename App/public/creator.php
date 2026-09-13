@@ -207,7 +207,7 @@ $headerActions = '<a class="icon-btn" href="creator.php?edit="><img class="btn-i
       <?php /* Both buttons sit outside their forms and target them by id, so
                they can share one row (forms cannot be nested). */ ?>
       <div class="form-actions">
-        <button type="submit" form="creator-form" class="btn">Save Changes</button>
+        <button type="submit" form="creator-form" class="btn"><img class="btn-icon" src="assets/img/icons/creator-save.png" alt="">Save Changes</button>
         <?php if ($editCreator && $editing !== 'default'): ?>
           <button type="submit" form="creator-delete-form" class="btn secondary"><img class="btn-icon" src="assets/img/icons/creator-delete.png" alt="">Delete Creator</button>
         <?php endif; ?>

@@ -45,11 +45,13 @@ NAMES=(
 )
 
 if [ "$(basename "$SHEET")" = "icons_v3.png" ]; then
+  # Names follow the sheet's own prompt, which lists what each cell was asked
+  # for (Docs/Assets/gemini_asset prompt.md, "site icons v3").
   NAMES=(
-    filter         video-delete  creator-delete  video-download
-    video-edit     category-add  image-upload    camera
-    close          palette       category-delete playlist-add
-    playlist-delete ""           ""              ""
+    filter          video-delete  creator-delete   video-save
+    video-edit      category-add  image-upload     capture
+    cancel          recolour      category-delete  playlist-add
+    playlist-delete creator-save  playlist-rename  video-remove
   )
 fi
 

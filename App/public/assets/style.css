@@ -1,4 +1,27 @@
+/* Carter One, the display face, for the brand and page headings only.
+   On trial — see the note below before this becomes permanent.
+
+   One @import rather than a <link> in each of the eight <head>s on the site.
+   It costs the preconnect hints, which matter for a first paint; if the face
+   stays, the links belong in views/header.php and the auth pages instead.
+
+   NOTE: this fetches from Google on every page load, from an app whose whole
+   premise is that nothing leaves the machine. Self-hosting the woff2 in
+   assets/ is two files and removes the call entirely. */
+@import url('https://fonts.googleapis.com/css2?family=Carter+One&display=swap');
+
 :root {
+  /* The stack's fallbacks matter: Carter One is fetched over the network, so
+     every heading renders in one of these until it lands — or for good, if
+     the machine is offline. */
+  --font-display: 'Carter One', 'Trebuchet MS', system-ui, sans-serif;
+  /* One height for every form control on the site. Buttons were 40px and the
+     inputs beside them were whatever their padding worked out to, so a row of
+     "file, number, button" — the upload panel — stepped up and down across
+     three different heights. Height rather than padding because a file input,
+     a number input and a button each compute their content box differently,
+     and matching their paddings does not make them the same size. */
+  --control-h: 40px;
   --bg: #111111;
   --bg-alt: #1b1b1b;
   --surface: #222222;
@@ -50,6 +73,34 @@ a {
   font-weight: 700;
   font-size: 16px;
   white-space: nowrap;
+}
+
+/* Display face on the wordmark and the page headings only. Carter One has a
+   single weight and a lot of personality — it reads as a logotype, not as
+   something to set a paragraph in. */
+/* The display face covers the heading layer — the wordmark, page and section
+   headings, the watch page's title, dialog titles, the filter panel and its
+   group headings. Deliberately NOT body text, tile titles or metadata: Carter
+   One has one weight and a lot of personality, which is what makes it a good
+   logotype and a bad paragraph. Long video titles in particular stay in the
+   system stack, where they wrap and truncate legibly. */
+h1,
+h2,
+h3,
+.brand-name,
+.page-title,
+.watch-title,
+.section-title,
+.filter-title,
+.filter-section summary,
+.modal-head h2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+.brand-name {
+  font-size: 19px;
 }
 
 .brand img {
@@ -156,6 +207,18 @@ a {
 
 .icon-btn.square .btn-icon {
   margin: 0;
+}
+
+/* An icon button that is showing something — the Filters toggle while its
+   panel is open. Same amber-ground, dark-ink treatment as an active nav pill,
+   so "this is on" looks the same everywhere. */
+.icon-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.icon-btn.active .btn-icon {
+  filter: brightness(0);
 }
 
 .user-menu {
@@ -325,14 +388,14 @@ a {
   min-width: 220px;
 }
 
-.upload-panel input[type="file"],
 .upload-panel input[type="number"] {
   width: 100%;
+  height: var(--control-h);
   background: var(--surface-alt);
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 6px;
-  padding: 8px 10px;
+  padding: 0 10px;
   font-size: 13px;
 }
 
@@ -360,8 +423,7 @@ a {
   display: flex;
   align-items: center;
   margin: 0 0 18px;
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 17px;
 }
 
 /* The panel's own scale. --icon-size is 28px, which is right for a nav pill
@@ -404,7 +466,6 @@ a {
   padding: 6px 0;
   margin-bottom: 4px;
   font-size: 12px;
-  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-muted);
@@ -484,6 +545,7 @@ a {
    edit screen. */
 select {
   width: 100%;
+  height: var(--control-h);
   background: var(--surface-alt);
   border: 1px solid var(--border);
   color: var(--text);
@@ -503,6 +565,69 @@ select {
 
 select:focus {
   outline: 2px solid var(--accent);
+}
+
+/* File inputs get the same global treatment as selects, and for the same
+   reason: left alone the browser draws its own light chrome, so every "Browse…"
+   on the site — the creator's picture, a video's preview image, the upload
+   panel — sat as a white block in the middle of a dark form.
+
+   The control is two pieces. The field itself takes the same shell as a text
+   input; the button inside it is only reachable through ::file-selector-button,
+   which needs its own font-family or it falls back to the platform UI face. */
+input[type="file"] {
+  width: 100%;
+  height: var(--control-h);
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 0 10px;
+  /* The field's content sits on one line box, so this is what centres the
+     button and the "no file selected" text inside the fixed height. */
+  line-height: calc(var(--control-h) - 2px);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+input[type="file"]::file-selector-button {
+  height: 28px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 5px;
+  padding: 0 12px;
+  margin-right: 10px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input[type="file"]::file-selector-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+input[type="file"]:focus {
+  outline: 2px solid var(--accent);
+}
+
+/* The category colour picker. It was styled inline at two different heights,
+   neither of which matched the row it stood in. */
+.swatch {
+  height: var(--control-h);
+  width: 60px;
+  padding: 2px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* Beside the compact buttons in the definitions table, which are 30px. */
+.swatch.small {
+  height: 30px;
+  width: 44px;
 }
 
 select option {
@@ -832,17 +957,18 @@ select option {
   margin-bottom: 6px;
 }
 
-.field input {
+.field input:not([type="checkbox"]):not([type="range"]):not([type="color"]) {
   width: 100%;
+  height: var(--control-h);
   background: var(--surface-alt);
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 6px;
-  padding: 10px 12px;
+  padding: 0 12px;
   font-size: 14px;
 }
 
-.field input:focus {
+.field input:not([type="checkbox"]):not([type="range"]):focus {
   outline: 2px solid var(--accent);
 }
 
@@ -863,7 +989,7 @@ select option {
   justify-content: center;
   gap: 8px;
   width: auto;
-  min-height: 40px;
+  min-height: var(--control-h);
   padding: 0 20px;
   background: var(--accent);
   color: #111;
@@ -1078,8 +1204,7 @@ select option {
 /* ---------- Nav helpers ---------- */
 
 .page-title {
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 22px;
   margin: 0 0 16px;
   padding: 0 24px;
 }
@@ -1518,7 +1643,8 @@ select option {
 
 .modal-search {
   margin: 14px 16px 8px;
-  padding: 9px 12px;
+  height: var(--control-h);
+  padding: 0 12px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--surface-alt);

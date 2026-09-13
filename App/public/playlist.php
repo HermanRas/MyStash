@@ -156,7 +156,7 @@ if ($editing !== null) {
                maxlength="<?= Playlists::MAX_NAME_LENGTH ?>" required
                value="<?= htmlspecialchars($editing['name'], ENT_QUOTES) ?>">
       </div>
-      <button type="submit" class="btn secondary">Rename</button>
+      <button type="submit" class="btn secondary"><img class="btn-icon" src="assets/img/icons/playlist-rename.png" alt="">Rename</button>
     </form>
 
     <p class="hint">
@@ -194,7 +194,7 @@ if ($editing !== null) {
           </div>
 
           <button type="button" class="btn secondary small playlist-remove"
-                  title="Remove from this playlist">Remove</button>
+                  title="Remove from this playlist"><img class="btn-icon" src="assets/img/icons/video-remove.png" alt="">Remove</button>
         </li>
       <?php endforeach; ?>
     </ul>
@@ -228,7 +228,7 @@ if ($editing !== null) {
 
     <div class="modal-head">
       <h2>Add videos</h2>
-      <button type="button" class="icon-btn square" id="add-videos-close" aria-label="Close"><img class="btn-icon" src="assets/img/icons/close.png" alt=""></button>
+      <button type="button" class="icon-btn square" id="add-videos-close" aria-label="Close"><img class="btn-icon" src="assets/img/icons/cancel.png" alt=""></button>
     </div>
 
     <input type="search" class="modal-search" id="add-videos-search"

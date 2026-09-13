@@ -67,9 +67,8 @@ $navActive = 'categories';
           <td style="padding:10px 0;">
             <form action="category_save.php" method="post" style="display:flex; gap:6px; align-items:center; justify-content:flex-end;">
               <input type="hidden" name="name" value="<?= htmlspecialchars($name, ENT_QUOTES) ?>">
-              <input type="color" name="color" value="<?= htmlspecialchars($color, ENT_QUOTES) ?>"
-                     style="height:30px; width:44px; padding:2px; background:var(--surface-alt); border:1px solid var(--border); border-radius:6px;">
-              <button type="submit" class="btn secondary small"><img class="btn-icon" src="assets/img/icons/palette.png" alt="">Recolour</button>
+              <input class="swatch small" type="color" name="color" value="<?= htmlspecialchars($color, ENT_QUOTES) ?>">
+              <button type="submit" class="btn secondary small"><img class="btn-icon" src="assets/img/icons/recolour.png" alt="">Recolour</button>
             </form>
           </td>
           <td style="padding:10px 0 10px 8px; text-align:right;">
@@ -90,8 +89,7 @@ $navActive = 'categories';
       </div>
       <div class="field" style="margin-bottom:0;">
         <label for="cat-color">Colour</label>
-        <input type="color" id="cat-color" name="color" value="#ffa31a"
-               style="height:38px; width:60px; padding:2px; background:var(--surface-alt); border:1px solid var(--border); border-radius:6px;">
+        <input class="swatch" type="color" id="cat-color" name="color" value="#ffa31a">
       </div>
       <button type="submit" class="btn"><img class="btn-icon" src="assets/img/icons/category-add.png" alt="">Add</button>
     </form>

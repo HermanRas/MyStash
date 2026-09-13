@@ -243,7 +243,7 @@ $navActive = 'videos';
             <p class="hint" style="margin:6px 0 0;">A video can credit more than one creator. Tick none and it falls back to <code>default</code>.</p>
           </div>
           <div class="form-actions">
-            <button type="submit" class="btn">Save Changes</button>
+            <button type="submit" class="btn"><img class="btn-icon" src="assets/img/icons/video-save.png" alt="">Save Changes</button>
             <a class="btn secondary" href="video.php?id=<?= urlencode($id) ?>">Cancel</a>
           </div>
         </form>
@@ -292,7 +292,7 @@ $navActive = 'videos';
                        max="<?= (int) $video['length_seconds'] ?>"
                        value="<?= (int) ($previewCapture ?? 0) ?>" required>
               </div>
-              <button type="submit" class="btn secondary"><img class="btn-icon" src="assets/img/icons/camera.png" alt="">Capture</button>
+              <button type="submit" class="btn secondary"><img class="btn-icon" src="assets/img/icons/capture.png" alt="">Capture</button>
             </form>
 
             <form action="video_preview.php" method="post" enctype="multipart/form-data" class="preview-row">
