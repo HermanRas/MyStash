@@ -1,0 +1,28 @@
+# Production overlay: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Three differences from the development stack, and each one is a decision:
+#
+#  - the code is mounted read-only into the PHP container, with only the
+#    datastore writable. Every persistent write this app makes lands under
+#    App/Data; sessions, job records, decrypt staging and the login counters
+#    are all in /dev/shm. Nothing writes to App/src or App/public at run time,
+#    so nothing needs permission to.
+#  - the published port is bound to the loopback interface. There is no TLS in
+#    front of this — see Docs/DEPLOY.md — and the password is the encryption
+#    key, so it must not cross a network in the clear.
+#  - the containers come back after a reboot, and PHP stops rendering its
+#    errors to the browser (App/php.prod.ini).
+services:
+  app:
+    ports: !override
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+
+  php:
+    volumes: !override
+      - ./App:/app:ro
+      - ./App/Data:/app/Data
+      # Loaded after mystash.ini — conf.d is read in alphabetical order, and
+      # zz sorts last — so these win where the two disagree.
+      - ./App/php.prod.ini:/usr/local/etc/php/conf.d/zz-mystash-prod.ini:ro
+    restart: unless-stopped
