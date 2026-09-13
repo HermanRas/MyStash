@@ -87,9 +87,20 @@ All verified end-to-end via curl (edit/rename/delete/convert/tag add-delete/cate
 - [ ] 4.28 **Conversion locks the whole app, and can lose the original.** Pressing Convert on the watch page runs `ffmpeg` synchronously inside the request (`App/public/video_convert.php`). Two separate problems, one of them urgent:
 
   - **The site goes away while it runs.** PHP's built-in server is single-threaded, so a transcode does not merely make that one request slow — every other page, thumbnail and media range request queues behind it. Observed: the convert POST never returned (`NS_ERROR_NET_EMPTY_RESPONSE` in the browser), and the whole app stopped answering until the container was restarted. This is the same disease as 6.6 and wants the same cure — a detached worker, a job record, a progress poll — so the two should share one mechanism rather than growing two.
-  - **The re-encrypt overwrites the only copy.** `$crypto->encrypt($convertedPath, $archivePath, $password)` writes straight over `{ID}.mp4.enc`, does not check its return value, and keeps no `.old` safety copy. Kill the request part way through that write — an aborted request, a container restart, a full disk — and the archive is left truncated with the source file already gone from tmpfs. Re-keying learned this lesson in 6.2/6.4 (write, verify, keep `.enc.old`, roll back on failure); conversion never did. **This one is worth fixing on its own, before and independently of the background job**, because the failure mode is losing a video rather than an ugly wait.
+  - **It can destroy the video it is converting** — split out as 4.29, because that half is worth fixing on its own and does not need the worker.
 
   Also missing while it runs: any indication in the UI that a conversion is in progress, and any guard against starting a second one over the top of the first.
+
+- [ ] 4.29 **Conversion must never overwrite the only copy of a video.** `App/public/video_convert.php` does `$crypto->encrypt($convertedPath, $archivePath, $password)` — straight over `{ID}.mp4.enc`, with the return value unchecked and no safety copy anywhere. By the time that write starts, the decrypted original exists only in tmpfs and is wiped by the `finally`. Interrupt it — an aborted request, a container restart, a full disk, a failed encrypt that returns false and is ignored — and the video is gone, with a truncated archive standing where it used to be. The convert button is the one place in the app where a routine action can lose data outright.
+
+  Re-keying already solved exactly this in 6.2/6.4 and conversion should borrow the pattern rather than invent one:
+
+  - **Write to a new path, never over the live one.** Encrypt to `{ID}.mp4.enc.new`, and only once that has been written successfully swap it in.
+  - **Check the encrypt succeeded**, and verify the result before trusting it — the cheapest honest check is to extract the new archive back and confirm it opens and is the expected size. A `false` return that nobody reads is how a zero-byte archive replaces a video.
+  - **Keep the previous bytes as `{ID}.mp4.enc.old`** until every step has succeeded, then remove it; on any failure, restore it and leave the video exactly as it was, still tagged `Not Converted`.
+  - **Order the writes so an interruption is survivable**: media first, then the per-video metadata, then the index — the same "index last" rule as 6.3, so a half-finished run leaves an index that still describes what is actually on disk.
+
+  Worth doing before 4.28's background worker, not after: the worker makes conversion pleasant, this makes it safe.
 
 ## Phase 5 — Search, Filter, Sort, Playlists
 
@@ -134,6 +145,17 @@ All verified end-to-end via curl (edit/rename/delete/convert/tag add-delete/cate
 
 - [x] 7.0 **User creation flow** — `App/public/register.php` + `App/src/User.php`, linked from the login page. Creates `{user}/videos/{user}.json.enc` with an empty video list, a `default` creator and a `Not Converted` category (both required by ingestion), then signs the user straight in. Usernames are letters/digits only, max 32 chars, and must be unused; the same validation now guards `login.php`, which also closes the path-traversal hole in 7.1. Verified: symbols, traversal attempts, duplicates, empty and mismatched passwords all rejected; a new stash logs in isolated and empty.
 - [x] 7.0.1 **Minimum password length: 24 characters**, enforced at registration (`User::MIN_PASSWORD_LENGTH`, checked server-side and hinted with `minlength` in the form). The password is the encryption key, is never stored, and cannot be reset or rate-limited at the archive itself — anyone with a copy of the `.7z` files can attack them offline — so length is the only defence. Login does not enforce the minimum, so stashes created before the rule still open.
+- [ ] 7.0.2 **Delete your stash, from the Profile screen.** Registration exists (7.0) with no way back out: a stash can only be removed by deleting `App/Data/{user}/` by hand, which is how the throwaway `HermanRas` test account had to go. The Profile page should own this, next to the password change.
+
+  What it has to get right, because this is the most destructive button in the app:
+
+  - **It deletes everything and nothing can undo it.** No trash, no backup, no password on file to recover with — the videos, previews, creator records and index all go. The confirmation has to say that in those words rather than "are you sure?".
+  - **Re-prove the password, not just a confirm dialog.** Require the current password and check it the authoritative way — by decrypting the index — exactly as `password_change.php` does. A session someone left open should not be enough to wipe a stash.
+  - **Make the confirmation deliberate**: type the username to enable the button. A modal that only needs a click is one mis-click from an empty data directory.
+  - **The target is `Session::user()` and never a request parameter.** The username must not be accepted from the form or the query string, or the endpoint becomes a way to delete somebody else's stash — the isolation concern 7.1 is about.
+  - **Destroy the session and land on the login page** once the directory is gone, with a plain confirmation. `Datastore::wipe()` already removes a tree recursively; deleting the user directory should go through one place that refuses any path outside `App/Data/`.
+  - Note what it is *not*: unlinking a file is not a secure erase, and the bytes may survive on the disk. That is acceptable here because everything in the directory is AES-encrypted with a password that was never stored — worth stating in the spec rather than implying.
+
 - [ ] 7.1 Confirm full isolation between `App/Data/{user}/` datastores — path traversal via `{user}` is handled (see 7.0); still to check: that one user can't probe another's existence, and that no cross-user paths leak anywhere else
 - [ ] 7.2 Review PHP `exec`/`proc_open` calls for command-injection safety (arguments arrays, not string interpolation)
 - [ ] 7.3 Rate-limit / lockout considerations on login attempts
