@@ -23,6 +23,22 @@ $timestamp = VideoCategories::parseTimestamp((string) ($_POST['timestamp'] ?? '0
 $index = Session::refreshIndex();
 $redirect = 'video.php?id=' . urlencode($id) . '&edit=1';
 
+// The id goes on to name a metadata archive, so it has to be one this stash
+// holds rather than whatever the form posted (7.1).
+$known = false;
+
+foreach ($index['videos'] ?? [] as $video) {
+    if ((string) $video['id'] === $id) {
+        $known = true;
+        break;
+    }
+}
+
+if (!Datastore::isValidId($id) || !$known) {
+    header('Location: wall.php');
+    exit;
+}
+
 // Only global categories can be assigned.
 if ($name === '' || !isset($index['categories'][$name])) {
     header('Location: ' . $redirect);

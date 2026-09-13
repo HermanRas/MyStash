@@ -22,6 +22,22 @@ $timestamp = (int) ($_POST['timestamp_seconds'] ?? -1);
 
 $index = Session::refreshIndex();
 
+// The id goes on to name a metadata archive, so it has to be one this stash
+// holds rather than whatever the form posted (7.1).
+$known = false;
+
+foreach ($index['videos'] ?? [] as $video) {
+    if ((string) $video['id'] === $id) {
+        $known = true;
+        break;
+    }
+}
+
+if (!Datastore::isValidId($id) || !$known) {
+    header('Location: wall.php');
+    exit;
+}
+
 $categories = new VideoCategories();
 $assignments = $categories->load(Session::user(), Session::password(), $id);
 
