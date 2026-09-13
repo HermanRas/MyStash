@@ -222,7 +222,16 @@ which is also why deleting one can never cost a video.
 
 **Creators** are stored the same way videos are. The creator record (`{ID}.json`: id, name, age, gender, bio, created/updated timestamps) is authoritative; the index keeps a denormalized summary of each so the wall, the creator grid and the filter panel can render without decrypting every creator archive on each page load — the same arrangement as the category names on video entries. Creators are still keyed by **display name** in the index, because that is what a video's `creator` field references; the ID only addresses the files, and survives a rename. Uploaded profile pictures are normalised to PNG before encryption, so the stored filename always describes the actual bytes.
 
-**Current state:** `App/Data/TestUser/videos/1.mp4` remains as a raw (unencrypted) sample fixture used to exercise the ffmpeg/7z pipeline directly (Phase 0 smoke test) and as upload input for manual testing — it is not itself part of the datastore layout. `App/bin/seed_testuser.php` seeds `TestUser.json.enc`, a `{ID}.json.enc` per demo entry and a `{ID}.json.enc` per demo creator (password `DS89HONPtufGDncNUoGfshCg` — 24 characters, per §2.1); it **merges**, so re-running it refreshes the demo rows without touching real uploads. Demo entries carry metadata only — no media files — so playback/conversion for them reports "no encrypted video file". Uploads through `App/public/upload.php` create complete `Video{ID}/...enc` entries following the layout above.
+**Seeding a development stash.** `App/Data` holds nothing but real stashes —
+there is no checked-in fixture, and the smoke suite synthesises the video it
+needs into tmpfs rather than depending on one. To fill a development stash with
+something to look at, `dev/make_sample_clips.sh` generates twelve clips across
+the four resolutions (four of them deliberately in a codec the app treats as
+unconverted) and `dev/seed_sample_data.sh` uploads them as `TestUser` through
+the real endpoints — register, upload, video_save, creator_save, playlist_save
+— so the result is a stash the application itself produced. `App/bin/seed_testuser.php`
+remains for metadata-only demo rows; entries it writes carry no media, so
+playback and conversion for them report "no encrypted video file".
 
 ## 4. UI/UX & Layout Specification
 
