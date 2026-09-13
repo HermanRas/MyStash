@@ -71,6 +71,16 @@ $searchPlaceholder = 'Search creators by name, bio or gender…';
 $searchClearHref = 'creator.php' . ($query->sort === CreatorQuery::DEFAULT_SORT ? '' : '?sort=' . urlencode($query->sort));
 $searchHidden = ['sort' => $query->sort];
 
+/**
+ * The Creators screen with one different sort, keeping the search term.
+ */
+$sortHref = static function (string $sort) use ($query): string {
+    return 'creator.php?' . http_build_query(array_filter([
+        'q' => $query->search,
+        'sort' => $sort,
+    ], static fn(string $value) => $value !== ''));
+};
+
 $navActive = 'creators';
 $headerActions = '<a class="icon-btn" href="creator.php?edit="><img class="btn-icon" src="assets/img/icons/creator.png" alt="">Add Creator</a>';
 ?>
@@ -80,6 +90,7 @@ $headerActions = '<a class="icon-btn" href="creator.php?edit="><img class="btn-i
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MyStash — Creators</title>
+<link rel="icon" href="assets/img/icon.png" type="image/png">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -99,16 +110,21 @@ $headerActions = '<a class="icon-btn" href="creator.php?edit="><img class="btn-i
       <?php endif; ?>
     </span>
 
-    <form method="get" action="creator.php" class="sort-form">
-      <input type="hidden" name="q" value="<?= htmlspecialchars($query->search, ENT_QUOTES) ?>">
-      <label for="sort"><img class="btn-icon" src="assets/img/icons/<?= $sortIcon ?>.png" alt="">Sort</label>
-      <select id="sort" name="sort" onchange="this.form.submit()">
+    <?php /* The same menu the wall uses — 5.9 deliberately made these two
+             controls identical, so they change together. */ ?>
+    <div class="sort-menu" tabindex="0">
+      <button type="button" class="icon-btn square sort-trigger"
+              title="Sort: <?= htmlspecialchars(CreatorQuery::SORTS[$query->sort], ENT_QUOTES) ?>"
+              aria-label="Sort: <?= htmlspecialchars(CreatorQuery::SORTS[$query->sort], ENT_QUOTES) ?>">
+        <img class="btn-icon" src="assets/img/icons/<?= $sortIcon ?>.png" alt="">
+      </button>
+      <div class="sort-menu-dropdown">
         <?php foreach (CreatorQuery::SORTS as $value => $label): ?>
-          <option value="<?= $value ?>" <?= $value === $query->sort ? 'selected' : '' ?>><?= $label ?></option>
+          <a class="<?= $value === $query->sort ? 'active' : '' ?>"
+             href="<?= htmlspecialchars($sortHref($value), ENT_QUOTES) ?>"><?= $label ?></a>
         <?php endforeach; ?>
-      </select>
-      <noscript><button type="submit" class="btn secondary small">Go</button></noscript>
-    </form>
+      </div>
+    </div>
   </div>
 
   <div class="creator-grid">

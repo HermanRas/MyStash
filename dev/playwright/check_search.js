@@ -100,7 +100,8 @@ const PASSWORD = process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg';
 
   // Search must survive narrowing and re-sorting, or the composition is a lie.
   await page.goto(`${BASE}/wall.php?q=${encodeURIComponent(word)}`, { waitUntil: 'networkidle' });
-  await page.selectOption('#sort', 'title_asc');
+  await page.hover('.sort-menu');
+  await page.click('.sort-menu-dropdown a[href*="sort=title_asc"]');
   await page.waitForLoadState('networkidle');
   check('changing the sort keeps the search',
     page.url().includes('q=') && await page.inputValue('.search-bar input[name="q"]') === word);

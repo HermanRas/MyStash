@@ -32,11 +32,13 @@ const AVATAR = '/work/avatar_fixture.png';
   // --- sort --------------------------------------------------------------
   const titles = async () => (await page.locator('.tile-title').allInnerTexts()).map(t => t.trim());
 
-  // Changing the menu submits the form, so wait the navigation out before reading.
+  // The sort is a hover menu of links now, not a <select> (4.31): hover the
+  // trigger to open it, then click the entry, which is an ordinary navigation.
   const sortBy = async (value) => {
+    await page.hover('.sort-menu');
     await Promise.all([
       page.waitForNavigation({ waitUntil: 'networkidle' }),
-      page.selectOption('#sort', value),
+      page.click(`.sort-menu-dropdown a[href*="sort=${value}"]`),
     ]);
     await page.waitForSelector('.video-grid');
   };
@@ -109,6 +111,74 @@ const AVATAR = '/work/avatar_fixture.png';
   }
 
   await page.screenshot({ path: '/work/screenshots/records_creators.png', fullPage: true });
+
+  // --- the header carries the nav, and the search sits after it (4.31) ----
+  await page.goto(`${BASE}/wall.php`, { waitUntil: 'networkidle' });
+
+  const order = await page.$$eval('.site-header > *', (els) => els.map((el) => el.className));
+  console.log('  header children:', JSON.stringify(order));
+  check('the nav is inside the header, before the search',
+    order.indexOf('header-left') < order.indexOf('search-bar')
+      && order.indexOf('search-bar') < order.indexOf('header-actions'));
+  check('there is no separate nav band below the header',
+    await page.locator('body > nav.category-bar').count() === 0);
+
+  // Icon-only, with the label kept as the tooltip and the accessible name.
+  for (const [id, label] of [['upload-toggle', 'Upload'], ['filters-toggle', 'Filters']]) {
+    const button = page.locator(`#${id}`);
+    check(`${label} is icon-only but still named (title="${await button.getAttribute('title')}")`,
+      (await button.innerText()).trim() === ''
+        && await button.getAttribute('title') === label
+        && await button.getAttribute('aria-label') === label);
+  }
+
+  // --- sort is a menu of links, not a <select> (4.31) --------------------
+  check('the sort control is an icon-only trigger with a dropdown',
+    await page.locator('.sort-menu .sort-trigger').count() === 1
+      && await page.locator('select#sort').count() === 0);
+
+  const sortLinks = await page.locator('.sort-menu-dropdown a').count();
+  check(`the dropdown offers every sort (${sortLinks})`, sortLinks === 8);
+  check('exactly one entry is marked as the current sort',
+    await page.locator('.sort-menu-dropdown a.active').count() === 1);
+
+  // The menu is hidden until hovered, exactly like the user menu.
+  check('the dropdown is closed until the trigger is hovered',
+    await page.locator('.sort-menu-dropdown').isHidden());
+  await page.hover('.sort-menu');
+  check('hovering opens it', await page.locator('.sort-menu-dropdown').isVisible());
+
+  // --- favicon -----------------------------------------------------------
+  check('the page declares a favicon',
+    await page.locator('link[rel="icon"]').count() === 1);
+
+  const favicon = await page.request.get(`${BASE}/favicon.ico`);
+  check(`/favicon.ico is served as an image (${favicon.status()} ${favicon.headers()['content-type']})`,
+    favicon.ok() && favicon.headers()['content-type'].startsWith('image/'));
+
+  // --- download: the way back out of the stash (4.30) --------------------
+  await page.goto(`${BASE}/video.php?id=1`, { waitUntil: 'networkidle' });
+
+  const title = (await page.locator('.watch-title').innerText()).trim();
+  const downloadLink = page.locator('.form-actions a[href*="download=1"]');
+  check('the watch page offers a download', await downloadLink.count() === 1);
+
+  const saved = await page.request.get(`${BASE}/media.php?id=1&type=video&download=1`);
+  const disposition = saved.headers()['content-disposition'] || '';
+  console.log('  content-disposition:', disposition);
+  check('it is sent as an attachment named after the video',
+    disposition.includes('attachment') && disposition.includes(`${title}.mp4`));
+
+  const streamed = await page.request.get(`${BASE}/media.php?id=1&type=video`);
+  check('the downloaded bytes are the whole video, same as the player streams',
+    (await saved.body()).length === (await streamed.body()).length
+      && (await saved.body()).length > 0);
+  console.log('  downloaded', (await saved.body()).length, 'bytes');
+
+  // Without the flag it must still play inline, or the player would start
+  // prompting to save the file instead of showing it.
+  check('the same URL without the flag is still inline',
+    !(streamed.headers()['content-disposition'] || '').includes('attachment'));
 
   // --- register page password rule --------------------------------------
   await page.goto(`${BASE}/register.php`, { waitUntil: 'networkidle' });

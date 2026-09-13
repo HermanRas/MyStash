@@ -25,7 +25,10 @@ const PASSWORD = process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg';
     action(),
   ]);
 
-  const chooseSort = (value) => submitting(() => page.selectOption('.sort-form select', value));
+  const chooseSort = (value) => submitting(async () => {
+    await page.hover('.sort-menu');
+    await page.click(`.sort-menu-dropdown a[href*="sort=${value}"]`);
+  });
   const searchFor = (term) => submitting(async () => {
     await page.fill('.search-bar input[name="q"]', term);
     await page.press('.search-bar input[name="q"]', 'Enter');
@@ -42,7 +45,7 @@ const PASSWORD = process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg';
 
   check('there is exactly one search box', await page.locator('input[name="q"]:visible').count() === 1);
   check('it targets the Creators page', (await page.getAttribute('.search-bar', 'action') || '').includes('creator.php'));
-  check('the page has a sort menu', await page.locator('.sort-form select').count() === 1);
+  check('the page has a sort menu', await page.locator('.sort-menu-dropdown').count() === 1);
 
   // Default order is name A→Z.
   check(`the default order is name A→Z (${all.join(', ')})`,
@@ -122,7 +125,7 @@ const PASSWORD = process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg';
   // Sort and search have to survive each other.
   await searchFor(term);
   check('searching keeps the chosen sort',
-    await page.inputValue('.sort-form select') === 'age_asc');
+    (await page.locator('.sort-menu-dropdown a.active').getAttribute('href')).includes('sort=age_asc'));
   check('the sort menu keeps the search',
     page.url().includes('q='));
 

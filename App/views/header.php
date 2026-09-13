@@ -16,7 +16,8 @@ declare(strict_types=1);
  * results load), and optionally $searchAction, $searchPlaceholder,
  * $searchClearHref and $searchHidden.
  *
- * The nav carries exactly three pills. Category names deliberately do NOT
+ * The nav carries exactly three pills, and sits in the header beside the
+ * search rather than on a band of its own. Category names deliberately do NOT
  * appear here: they live in the wall's left filter panel, and having both was
  * two ways to do the same thing. "All Videos" links to the bare wall URL, so
  * it doubles as the reset for whatever filters are applied.
@@ -46,10 +47,30 @@ $navPills = [
 ];
 ?>
 <header class="site-header">
-  <a class="brand" href="wall.php">
-    <img src="assets/img/mark.png" alt="MyStash">
-    MyStash
-  </a>
+  <?php /* Brand and nav are one group so that it and the actions group can be
+           given equal weight, which is what puts the search box on the page's
+           centre line rather than merely in the middle of whatever space its
+           two neighbours happen to leave. */ ?>
+  <div class="header-left">
+    <a class="brand" href="wall.php">
+      <img src="assets/img/mark.png" alt="MyStash">
+      <span class="brand-name">MyStash</span>
+    </a>
+
+  <?php /* The nav lives in the header rather than on a row of its own: a
+           whole band of chrome above the wall was a lot of vertical space for
+           three links. */ ?>
+    <nav class="category-bar">
+      <?php foreach ($navPills as $key => [$label, $href, $icon]): ?>
+        <?php /* The label is dropped on a narrow window (see style.css), so it
+                 carries a title for the tooltip the icon alone would not give. */ ?>
+        <a class="pill<?= $key === $navActive ? ' active' : '' ?>" href="<?= $href ?>"
+           title="<?= $label ?>">
+          <img class="pill-icon" src="assets/img/icons/<?= $icon ?>.png" alt=""><span class="pill-label"><?= $label ?></span>
+        </a>
+      <?php endforeach; ?>
+    </nav>
+  </div>
 
   <?php /* The site's one search box. On the Creators screen it searches
            creators in place; everywhere else it searches videos and lands on
@@ -85,11 +106,3 @@ $navPills = [
     </div>
   </div>
 </header>
-
-<nav class="category-bar">
-  <?php foreach ($navPills as $key => [$label, $href, $icon]): ?>
-    <a class="pill<?= $key === $navActive ? ' active' : '' ?>" href="<?= $href ?>">
-      <img class="pill-icon" src="assets/img/icons/<?= $icon ?>.png" alt=""><?= $label ?>
-    </a>
-  <?php endforeach; ?>
-</nav>

@@ -51,7 +51,7 @@ const PASSWORD = process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg';
 
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'networkidle' }),
-    page.selectOption('#sort', 'title_asc'),
+    page.click('.sort-menu-dropdown a[href*="sort=title_asc"]'),
   ]);
   check('sorting keeps the creator filter', page.url().includes('creator%5B%5D='));
   check('the checkbox stays ticked', await page.locator(`input[type="checkbox"][name="creator[]"][value="${name}"]`).isChecked());

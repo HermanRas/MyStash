@@ -35,7 +35,9 @@ a {
   z-index: 10;
   display: flex;
   align-items: center;
-  gap: 24px;
+  /* The nav pills moved in here, so the gaps are tighter than they were when
+     this row held only three things. */
+  gap: 16px;
   background: var(--bg-alt);
   border-bottom: 1px solid var(--border);
   padding: 12px 24px;
@@ -65,8 +67,19 @@ a {
 
 .search-bar {
   position: relative;
-  flex: 1;
+  /* Centred between the nav and the action buttons, taking the slack equally
+     on both sides (auto margins are served before flex-grow, so this centres
+     rather than stretches).
+
+     Not centred on the page's centre line, deliberately: the brand and the
+     three nav pills are about 550px wide, so a 640px box centred on the page
+     would have to start at 430px and run underneath them. Centring it in the
+     space that is actually free keeps the box full width and nothing
+     overlaps. */
+  flex: 1 1 auto;
   max-width: 640px;
+  margin-inline: auto;
+  min-width: 160px;
 }
 
 .search-bar input {
@@ -105,11 +118,14 @@ a {
   padding-right: 32px;
 }
 
+/* Brand + nav on the left, actions on the right; neither shrinks, so the
+   search box is what gives way on a narrow window. */
+.header-left,
 .header-actions {
   display: flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 16px;
-  margin-left: auto;
 }
 
 .icon-btn {
@@ -124,6 +140,22 @@ a {
 
 .icon-btn:hover {
   border-color: var(--accent);
+}
+
+/* Icon-only: a square the same height as the labelled version, so a row can
+   mix the two without the baseline moving. The label lives in `title` and
+   `aria-label` instead of on screen. */
+.icon-btn.square {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+}
+
+.icon-btn.square .btn-icon {
+  margin: 0;
 }
 
 .user-menu {
@@ -234,12 +266,12 @@ a {
 
 /* ---------- Category Pill Bar ---------- */
 
+/* Lives inside the header now (see views/header.php) — no padding, no rule
+   under it, and it must not steal width from the search box. */
 .category-bar {
   display: flex;
-  gap: 10px;
-  padding: 12px 24px;
-  overflow-x: auto;
-  border-bottom: 1px solid var(--border);
+  gap: 8px;
+  flex: 0 0 auto;
 }
 
 .pill {
@@ -646,22 +678,52 @@ select option {
   font-weight: 400;
 }
 
-.sort-form {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* The sort control: a bare icon that opens a menu, built the same way as the
+   user menu in the header so the two behave identically. Each entry is a real
+   link, so sorting works with scripting off and stays linkable. */
+.sort-menu {
+  position: relative;
 }
 
-.sort-form label {
-  font-size: 12px;
-  color: var(--text-muted);
+.sort-menu-dropdown {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 5;
+  background: var(--surface);
+  background-clip: padding-box;
+  border: 1px solid var(--border);
+  /* The gap below the trigger is a transparent border rather than an offset,
+     so crossing it with the pointer doesn't drop :hover and close the menu. */
+  border-top: 8px solid transparent;
+  border-radius: 8px;
+  min-width: 200px;
+  overflow: hidden;
 }
 
-.sort-form select {
-  width: auto;
-  /* Room for the custom arrow, which `width: auto` doesn't account for. */
-  padding: 6px 30px 6px 10px;
-  font-size: 12px;
+.sort-menu:hover .sort-menu-dropdown,
+.sort-menu:focus-within .sort-menu-dropdown {
+  display: block;
+}
+
+.sort-menu-dropdown a {
+  display: block;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.sort-menu-dropdown a:hover {
+  background: var(--surface-alt);
+  color: var(--accent);
+}
+
+.sort-menu-dropdown a.active {
+  background: var(--surface-alt);
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .creator-name {
@@ -1027,4 +1089,25 @@ select option {
 .job-card[data-state="failed"] .progress-bar {
   background: #cc4444;
   animation: none;
+}
+
+/* ---------- Narrow windows ----------
+   The header carries the brand, three nav pills, the search and the action
+   buttons on one row. Below about 1100px that no longer fits and the user menu
+   was being pushed off the right edge, so the two most redundant pieces of text
+   go: the wordmark (the mark beside it says the same thing) and the pill
+   labels (each pill keeps its icon and gains a tooltip). */
+@media (max-width: 1100px) {
+  .brand-name,
+  .pill-label {
+    display: none;
+  }
+
+  .pill {
+    padding: 8px 12px;
+  }
+
+  .pill-icon {
+    margin: 0;
+  }
 }

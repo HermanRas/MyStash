@@ -21,12 +21,19 @@ use MyStash\CreatorStore;
  * Nothing is ever written back out decrypted to persistent disk — the
  * archive is extracted to tmpfs, streamed (with HTTP Range support for
  * video/mp4 seeking), then wiped.
+ *
+ * With `&download=1` the same bytes are sent as an attachment instead of
+ * inline, which is how a video gets back out of the stash (Docs/PLAN.md 4.30).
+ * Uploading with no way to retrieve was an oversight: the archives are only
+ * openable with the password, so without this the only way out was 7zip on the
+ * command line.
  */
 
 Session::requireLogin();
 
 $id = (string) ($_GET['id'] ?? '');
 $type = (string) ($_GET['type'] ?? '');
+$download = isset($_GET['download']);
 
 $suffixes = [
     'thumb' => ['jpg.preview.enc', 'image/jpeg'],
@@ -95,6 +102,15 @@ if (isset($_SERVER['HTTP_RANGE']) && preg_match('/bytes=(\d*)-(\d*)/', $_SERVER[
 http_response_code($status);
 header("Content-Type: {$contentType}");
 header('Accept-Ranges: bytes');
+
+if ($download) {
+    // The archive stores the file under its internal id ("1.mp4"), which is
+    // meaningless outside the stash — so the download is named after the
+    // video's title. The index is only opened on this branch: media.php is
+    // called for every thumbnail on the wall, and decrypting the index each
+    // time to name a file nobody is saving would be wasteful.
+    header('Content-Disposition: attachment; filename="' . downloadFilename($id, $plainPath) . '"');
+}
 header('Content-Length: ' . ($end - $start + 1));
 if ($status === 206) {
     header("Content-Range: bytes {$start}-{$end}/{$size}");
@@ -112,3 +128,34 @@ while ($remaining > 0 && !feof($fh)) {
     $remaining -= strlen($chunk);
 }
 fclose($fh);
+
+/**
+ * A human-meaningful filename for a downloaded video, keeping the real
+ * extension the archive holds.
+ *
+ * Everything that is not a letter, digit, space, dash or underscore is
+ * dropped: the title is the user's own text and this value goes into a
+ * response header and then onto their filesystem, so neither quotes, newlines
+ * nor path separators may survive it.
+ */
+function downloadFilename(string $id, string $plainPath): string
+{
+    $extension = strtolower((string) pathinfo($plainPath, PATHINFO_EXTENSION));
+    $title = '';
+
+    foreach (Session::index()['videos'] ?? [] as $video) {
+        if ((string) $video['id'] === $id) {
+            $title = (string) ($video['title'] ?? '');
+            break;
+        }
+    }
+
+    $safe = trim((string) preg_replace('/[^A-Za-z0-9 _-]+/', '', $title));
+    $safe = (string) preg_replace('/\s+/', ' ', $safe);
+
+    if ($safe === '') {
+        $safe = 'video-' . $id;
+    }
+
+    return $extension === '' ? $safe : "{$safe}.{$extension}";
+}

@@ -31,6 +31,7 @@ $navActive = 'categories';
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MyStash — Categories</title>
+<link rel="icon" href="assets/img/icon.png" type="image/png">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>

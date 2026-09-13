@@ -70,6 +70,7 @@ $navActive = 'videos';
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MyStash — <?= htmlspecialchars($video['title'], ENT_QUOTES) ?></title>
+<link rel="icon" href="assets/img/icon.png" type="image/png">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -134,6 +135,13 @@ $navActive = 'videos';
     <?php if (!$editing): ?>
       <div class="form-actions">
         <a class="btn secondary" href="video.php?id=<?= urlencode($id) ?>&edit=1">Edit Video</a>
+
+        <?php /* The way back out. Everything in the stash is encrypted with a
+                 password 7zip holds, so without this the only way to get a
+                 video off the wall again was the command line. */ ?>
+        <a class="btn secondary" href="media.php?id=<?= urlencode($id) ?>&amp;type=video&amp;download=1">
+          <img class="btn-icon" src="assets/img/icons/download.png" alt="">Download
+        </a>
 
         <?php /* While a conversion is running the button is gone, not merely
                  disabled — a second run over the same archive is refused by the

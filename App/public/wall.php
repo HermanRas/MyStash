@@ -46,12 +46,37 @@ $sortIcon = match ($query->sort) {
     default => str_ends_with($query->sort, '_asc') ? 'sort-09' : 'sort-90',
 };
 
+/**
+ * The wall's URL with one different sort, keeping every filter and the search
+ * term exactly as they are — which is what makes a sorted, filtered wall a
+ * link somebody can keep.
+ */
+$sortHref = static function (string $sort) use ($query): string {
+    return 'wall.php?' . http_build_query([
+        ...array_filter([
+            'q' => $query->search,
+            'gender' => $query->gender,
+        ], static fn(string $value) => $value !== ''),
+        'category' => $query->categories,
+        'creator' => $query->creators,
+        'len_min' => $query->minMinutes,
+        'len_max' => $query->maxMinutes,
+        'age_min' => $query->minAge,
+        'age_max' => $query->maxAge,
+        'sort' => $sort,
+    ]);
+};
+
 $navActive = 'videos';
 $searchTerm = $query->search;
-$headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="false" aria-controls="upload-panel">'
-    . '<img class="btn-icon" src="assets/img/icons/upload.png" alt="">Upload</button>'
-    . '<button class="icon-btn" id="filters-toggle" aria-expanded="true" aria-controls="filter-panel">'
-    . '<img class="btn-icon" id="filters-chevron" src="assets/img/icons/chevron-up.png" alt="">Filters</button>';
+// Icon only, with the label as the tooltip and as the accessible name — the
+// two words were costing header width that the search box makes better use of.
+$headerActions = '<button class="icon-btn square" id="upload-toggle" title="Upload" aria-label="Upload"'
+    . ' aria-expanded="false" aria-controls="upload-panel">'
+    . '<img class="btn-icon" src="assets/img/icons/upload.png" alt=""></button>'
+    . '<button class="icon-btn square" id="filters-toggle" title="Filters" aria-label="Filters"'
+    . ' aria-expanded="true" aria-controls="filter-panel">'
+    . '<img class="btn-icon" id="filters-chevron" src="assets/img/icons/chevron-up.png" alt=""></button>';
 ?>
 <!doctype html>
 <html lang="en">
@@ -59,6 +84,7 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MyStash — Wall</title>
+<link rel="icon" href="assets/img/icon.png" type="image/png">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -181,27 +207,23 @@ $headerActions = '<button class="icon-btn" id="upload-toggle" aria-expanded="fal
           (filtered)
         <?php endif; ?>
       </span>
-      <form method="get" action="wall.php" class="sort-form">
-        <?php foreach ($query->categories as $name): ?>
-          <input type="hidden" name="category[]" value="<?= htmlspecialchars($name, ENT_QUOTES) ?>">
-        <?php endforeach; ?>
-        <?php foreach ($query->creators as $name): ?>
-          <input type="hidden" name="creator[]" value="<?= htmlspecialchars($name, ENT_QUOTES) ?>">
-        <?php endforeach; ?>
-        <input type="hidden" name="len_min" value="<?= $query->minMinutes ?>">
-        <input type="hidden" name="len_max" value="<?= $query->maxMinutes ?>">
-        <input type="hidden" name="age_min" value="<?= $query->minAge ?>">
-        <input type="hidden" name="age_max" value="<?= $query->maxAge ?>">
-        <input type="hidden" name="gender" value="<?= htmlspecialchars($query->gender, ENT_QUOTES) ?>">
-        <input type="hidden" name="q" value="<?= htmlspecialchars($query->search, ENT_QUOTES) ?>">
-        <label for="sort"><img class="btn-icon" src="assets/img/icons/<?= $sortIcon ?>.png" alt="">Sort</label>
-        <select id="sort" name="sort" onchange="this.form.submit()">
+      <?php /* A menu rather than a <select>: every option is a real link
+               carrying the current filters, so a sort stays linkable, needs no
+               JavaScript, and the trigger can be a bare icon like the user
+               menu instead of a labelled control eating toolbar width. */ ?>
+      <div class="sort-menu" tabindex="0">
+        <button type="button" class="icon-btn square sort-trigger"
+                title="Sort: <?= htmlspecialchars(VideoQuery::SORTS[$query->sort], ENT_QUOTES) ?>"
+                aria-label="Sort: <?= htmlspecialchars(VideoQuery::SORTS[$query->sort], ENT_QUOTES) ?>">
+          <img class="btn-icon" src="assets/img/icons/<?= $sortIcon ?>.png" alt="">
+        </button>
+        <div class="sort-menu-dropdown">
           <?php foreach (VideoQuery::SORTS as $value => $label): ?>
-            <option value="<?= $value ?>" <?= $value === $query->sort ? 'selected' : '' ?>><?= $label ?></option>
+            <a class="<?= $value === $query->sort ? 'active' : '' ?>"
+               href="<?= htmlspecialchars($sortHref($value), ENT_QUOTES) ?>"><?= $label ?></a>
           <?php endforeach; ?>
-        </select>
-        <noscript><button type="submit" class="btn secondary small">Go</button></noscript>
-      </form>
+        </div>
+      </div>
     </div>
 
     <div class="video-grid">

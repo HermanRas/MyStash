@@ -74,7 +74,7 @@ const PASSWORD = process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg';
   check(`creators sort by views, max→min (${sorted.join(' ')})`,
     sorted.every((v, i) => i === 0 || sorted[i - 1] >= v));
   check('the views sort is offered in the menu',
-    await page.locator('.sort-form select option[value="views_desc"]').count() === 1);
+    await page.locator('.sort-menu-dropdown a[href*="sort=views_desc"]').count() === 1);
 
   // --- 5.2: the age and gender filters actually filter. ---
   // Expectations come from the creators' own records, read off the edit form,
@@ -145,8 +145,8 @@ const PASSWORD = process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg';
     await page.locator('details.filter-section:has(#age-min)').evaluate((el) => el.open));
   check('the count line says the wall is filtered',
     (await page.locator('.wall-count').innerText()).toLowerCase().includes('filter'));
-  check('the sort form carries the age filter through',
-    await page.locator('.sort-form input[name="age_min"]').inputValue() === '20');
+  check('the sort links carry the age filter through',
+    (await page.locator('.sort-menu-dropdown a').first().getAttribute('href')).includes('age_min=20'));
   await page.screenshot({ path: '/work/screenshots/creator_filters.png' });
 
   console.log(failures === 0 ? 'check_creator_filters: all passed' : `check_creator_filters: ${failures} failed`);
