@@ -42,9 +42,14 @@ final class VideoIngest
         ?string $previewImagePathIn = null,
     ): array {
         $id = Datastore::nextVideoId($index);
-        $ext = strtolower(pathinfo($originalFilename, PATHINFO_EXTENSION)) ?: 'mp4';
+        $ext = self::safeExtension($originalFilename);
 
         $workDir = Datastore::tmpfsWorkDir('ingest');
+
+        // Null until the claim below succeeds, and cleared again once the entry
+        // is safely built: what the finally uses to tell "we own this directory
+        // and the ingest did not finish" from "there is nothing to undo".
+        $claimedDir = null;
 
         try {
             $originalPath = "{$workDir}/original.{$ext}";
@@ -59,7 +64,25 @@ final class VideoIngest
             $notConverted = VideoQuality::isNotConverted($ext, $codec);
 
             $duration = $this->encoder->durationSeconds($originalPath) ?? 0.0;
-            $previewAt = $previewTimestamp ?? min(15.0, max(0.0, $duration - 0.5));
+
+            // Clamped, never trusted. upload.php casts preview_at straight from
+            // the form to a float with no bounds of its own, so a timestamp
+            // past the end of the video arrives here intact — and ffmpeg, asked
+            // for a frame that does not exist, writes no file at all while
+            // still exiting 0. The encrypt() below then died on the missing
+            // file and took the whole upload down with it, after the video had
+            // already been transferred in full (7.2.1).
+            //
+            // VideoPreview::fromTimestamp() refuses an out-of-range timestamp
+            // outright, and is right to: the user is on the edit screen and can
+            // simply be told. Here the video is already staged, so the right
+            // answer is to move the frame, not to throw the video away.
+            $defaultAt = min(15.0, max(0.0, $duration - 0.5));
+            $previewAt = $previewTimestamp ?? $defaultAt;
+
+            if (!is_finite($previewAt) || $previewAt < 0.0 || ($duration > 0.0 && $previewAt > $duration)) {
+                $previewAt = $defaultAt;
+            }
 
             $previewImagePath = "{$workDir}/preview.jpg";
             $customPreview = false;
@@ -80,6 +103,21 @@ final class VideoIngest
 
             if (!$customPreview) {
                 $this->encoder->extractFrame($originalPath, $previewImagePath, $previewAt);
+            }
+
+            // Belt and braces for what the clamp cannot foresee: a truncated
+            // file, a duration ffprobe could not read, a timestamp with no
+            // decodable frame behind it. Every video is required to have a
+            // preview — media.php 404s without one and the wall tile shows a
+            // broken image — so fall back to the very first frame, and only
+            // then give up, with a message that says what actually happened.
+            if (!is_file($previewImagePath)) {
+                $this->encoder->extractFrame($originalPath, $previewImagePath, 0.0);
+                $previewAt = 0.0;
+            }
+
+            if (!is_file($previewImagePath)) {
+                throw new \RuntimeException('No frame could be read from this video.');
             }
 
             // The clip is a timelapse over the whole video, so unlike the
@@ -117,6 +155,11 @@ final class VideoIngest
                 $videoDir = Datastore::videoDir($user, $id);
             }
 
+            // The loop only exits once mkdir() has succeeded, so from here the
+            // directory is ours and every failure below has to take it back
+            // down again — see the finally.
+            $claimedDir = $videoDir;
+
             $metadata = [
                 'id' => $id,
                 'title' => pathinfo($originalFilename, PATHINFO_FILENAME),
@@ -143,6 +186,9 @@ final class VideoIngest
             $this->crypto->encrypt($previewImagePath, "{$videoDir}/{$id}.jpg.preview.enc", $password);
             $this->crypto->encrypt($metadataPath, "{$videoDir}/{$id}.json.enc", $password);
 
+            // Everything is on disk; the caller adds it to the index next.
+            $claimedDir = null;
+
             return [
                 'id' => $id,
                 'title' => $metadata['title'],
@@ -161,7 +207,36 @@ final class VideoIngest
             ];
         } finally {
             Datastore::wipe($workDir);
+
+            // A directory claimed but never completed is unreachable by
+            // definition — the index is only written by the caller once this
+            // returns — so anything left here is invisible to every screen in
+            // the app, cannot be deleted from the UI, and still holds megabytes
+            // of encrypted video while permanently owning an id the claim loop
+            // then has to skip. Take it back down (7.2.1).
+            if ($claimedDir !== null) {
+                Datastore::wipe($claimedDir);
+            }
         }
+    }
+
+    /**
+     * The upload's file extension, reduced to something safe to put in a path.
+     *
+     * The name comes from the browser and is entirely attacker-controlled.
+     * `pathinfo()` takes the basename first, so `..` and embedded slashes
+     * cannot escape — but the result still lands in a filesystem path and in
+     * the stored metadata, and an extension of 300 characters made the staged
+     * filename longer than the 255 bytes the filesystem allows, which failed
+     * the upload outright *after* the whole video had been transferred. Letters
+     * and digits only, and short (7.2.1).
+     */
+    private static function safeExtension(string $originalFilename): string
+    {
+        $ext = strtolower(pathinfo($originalFilename, PATHINFO_EXTENSION));
+        $ext = preg_replace('/[^a-z0-9]/', '', $ext) ?? '';
+
+        return $ext !== '' ? substr($ext, 0, 12) : 'mp4';
     }
 
     private function randomTileGradient(): array

@@ -821,4 +821,90 @@ step('no .old or .new copies left behind', $litter === []);
 Datastore::wipe(Datastore::userDir($previewUser));
 step('cleaned up', !is_dir(Datastore::userDir($previewUser)));
 
+// -------------------------------------------------------------------------
+echo PHP_EOL . "-- hostile input at the command boundary (7.2) --" . PHP_EOL;
+// -------------------------------------------------------------------------
+//
+// Every external program this app runs is started with an argv array through
+// proc_open(), never a shell string, so nothing a user types can become a
+// command. These assert that rather than trusting it — and they assert it
+// through the values a user genuinely controls: the encryption password and
+// the uploaded filename.
+
+$injUser = 'InjProbe' . bin2hex(random_bytes(3));
+
+// Every shell metacharacter that matters, inside the password — which is
+// passed to 7z as `-p<password>` on every single encrypt and extract.
+$injKey = 'a$(touch /tmp/mystash-pwned-pw)`touch /tmp/mystash-pwned-bt`;|&<>"\' --zz';
+
+foreach (['/tmp/mystash-pwned-pw', '/tmp/mystash-pwned-bt', '/tmp/mystash-pwned-fn'] as $canary) {
+    @unlink($canary);
+}
+
+step("create a stash whose password is nothing but shell metacharacters ({$injUser})",
+    (new User())->create($injUser, $injKey));
+
+$injStore = new Datastore();
+step('...and the index reopens with it, so it was stored verbatim',
+    $injStore->loadIndex($injUser, $injKey) !== null);
+
+// The same treatment for the filename, which comes from the browser.
+$injIndex = $injStore->loadIndex($injUser, $injKey);
+$injEntry = (new VideoIngest())->ingest(
+    $injUser, $injKey, $fixture, 'evil$(touch /tmp/mystash-pwned-fn)`id`;rm -rf /.mp4', $injIndex,
+);
+step('a filename full of shell metacharacters ingests normally', isset($injEntry['id']));
+
+foreach (['/tmp/mystash-pwned-pw', '/tmp/mystash-pwned-bt', '/tmp/mystash-pwned-fn'] as $canary) {
+    step("nothing executed: {$canary}", !file_exists($canary));
+}
+
+// pathinfo() takes the basename first, so neither `..` nor an embedded slash
+// can walk out of the work directory — and safeExtension() then strips the
+// result down to letters and digits.
+$injIndex = $injStore->loadIndex($injUser, $injKey);
+$traversal = (new VideoIngest())->ingest(
+    $injUser, $injKey, $fixture, 'a.mp4/../../../../app/public/shell.php', $injIndex,
+);
+step('a traversing filename cannot choose the stored extension (' . $traversal['format'] . ')',
+    preg_match('/^[a-z0-9]{1,12}$/', $traversal['format']) === 1);
+step('...and nothing was written outside App/Data', !file_exists(__DIR__ . '/../public/shell.php'));
+
+// 7.2.1 — what the audit turned up. Each of these used to fail the upload
+// *after* the whole video had been transferred, and leave an encrypted
+// directory behind that no screen could reach and no button could delete.
+$orphans = static fn(): array => array_map('basename', glob(Datastore::userDir($injUser) . '/videos/Video*') ?: []);
+$before = $orphans();
+
+$injIndex = $injStore->loadIndex($injUser, $injKey);
+$past = (new VideoIngest())->ingest($injUser, $injKey, $fixture, 'past.mp4', $injIndex, 999999.0);
+$pastMeta = $injStore->loadVideoMetadata($injUser, $injKey, (string) $past['id']);
+step('a preview timestamp past the end of the video no longer fails the upload', isset($past['id']));
+step('...and is clamped to somewhere inside it (' . (float) $pastMeta['preview_capture_seconds'] . 's)',
+    (float) $pastMeta['preview_capture_seconds'] <= (float) $past['length_seconds']);
+
+$injIndex = $injStore->loadIndex($injUser, $injKey);
+$long = (new VideoIngest())->ingest($injUser, $injKey, $fixture, 'x.' . str_repeat('A', 300), $injIndex);
+step('a 300-character extension no longer fails the upload (stored as "' . $long['format'] . '")',
+    strlen((string) $long['format']) <= 12);
+
+// The one case that *should* still fail — and must fail cleanly.
+$notVideo = Datastore::tmpfsWorkDir('smokeinj') . '/junk.mp4';
+file_put_contents($notVideo, 'this is not a video');
+$injIndex = $injStore->loadIndex($injUser, $injKey);
+$beforeJunk = $orphans();
+
+try {
+    (new VideoIngest())->ingest($injUser, $injKey, $notVideo, 'junk.mp4', $injIndex);
+    step('a file that is not a video is refused', false);
+} catch (\Throwable $e) {
+    step('a file that is not a video is refused, with a real message (' . $e->getMessage() . ')',
+        $e->getMessage() !== '');
+}
+
+step('...and the failed upload left no orphan directory behind', $orphans() === $beforeJunk);
+
+Datastore::wipe(Datastore::userDir($injUser));
+step('cleaned up', !is_dir(Datastore::userDir($injUser)));
+
 echo PHP_EOL . "All smoke tests passed." . PHP_EOL;
