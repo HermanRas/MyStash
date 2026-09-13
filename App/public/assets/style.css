@@ -387,6 +387,12 @@ h3,
   display: block;
 }
 
+.upload-error {
+  margin: 0 0 12px;
+  color: #ff6b6b;
+  font-size: 14px;
+}
+
 .upload-panel form {
   display: flex;
   align-items: flex-end;

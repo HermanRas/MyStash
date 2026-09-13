@@ -263,6 +263,28 @@ final class VideoEncoder
         float $intervalSeconds = 15.0,
         int $playbackFps = 4,
     ): bool {
+        // A fixed 15s stride assumes a video long enough to have 15s in it.
+        // `fps=1/15` emits a frame per 15-second slot the input actually
+        // spans, so a 5-second clip produced *no frames at all*, this returned
+        // false, and ingestion then handed a path that did not exist to the
+        // encrypter — a fatal on a plain upload of a short video. Below twice
+        // the stride the interval is derived from the video instead, aiming at
+        // eight frames, which is a skim rather than a single still.
+        //
+        // Only below that threshold: for anything longer the 15s stride is the
+        // specified behaviour and stays exactly as it was.
+        $duration = $this->durationSeconds($inputPath);
+
+        if ($duration !== null && $duration > 0 && $duration < $intervalSeconds * 2) {
+            // Eight frames where there is room for them, fewer where there is
+            // not: at $playbackFps the clip is frames/fps seconds long, and a
+            // preview that runs as long as the video it previews is not a
+            // preview. Half the source is the ceiling, two frames the floor —
+            // one frame is a still, and the tile already has one of those.
+            $frames = (int) min(8, max(2, floor($duration * $playbackFps / 2)));
+            $intervalSeconds = max(0.2, $duration / $frames);
+        }
+
         // Done in two passes — sample the stills, then join them at the
         // playback rate. Re-timing in a single pass (setpts/-r) makes ffmpeg
         // drop most of the sampled frames.

@@ -90,7 +90,16 @@ $headerActions = '<button class="icon-btn square" id="upload-toggle" title="Uplo
 
 <?php require __DIR__ . '/../views/header.php'; ?>
 
-<div class="upload-panel" id="upload-panel">
+<?php
+// A refused upload comes back here with its reason. The panel is opened for
+// it: the message belongs beside the form that produced it, and a notice on
+// a collapsed panel is a notice nobody reads.
+$uploadError = (string) ($_GET['upload_error'] ?? '');
+?>
+<div class="upload-panel<?= $uploadError !== '' ? ' open' : '' ?>" id="upload-panel">
+  <?php if ($uploadError !== ''): ?>
+    <p class="upload-error"><?= htmlspecialchars($uploadError, ENT_QUOTES) ?></p>
+  <?php endif; ?>
   <form action="upload.php" method="post" enctype="multipart/form-data">
     <div class="field">
       <label for="video-file">Video file</label>

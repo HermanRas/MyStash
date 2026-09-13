@@ -123,7 +123,15 @@ final class VideoIngest
             // The clip is a timelapse over the whole video, so unlike the
             // preview image it doesn't start from the chosen timestamp.
             $previewClipPath = "{$workDir}/preview.mp4";
-            $this->encoder->buildPreviewClip($originalPath, $previewClipPath);
+
+            // Checked, because the alternative is what used to happen: a false
+            // here went unnoticed and the missing file surfaced four lines
+            // later as an uncaught exception out of the encrypter, with the
+            // password in its stack trace.
+            if (!$this->encoder->buildPreviewClip($originalPath, $previewClipPath)
+                || !is_file($previewClipPath)) {
+                throw new \RuntimeException('No preview could be built from this video.');
+            }
 
             // Both derived tags come from the file itself and are never
             // user-editable — see VideoQuality.
