@@ -62,13 +62,31 @@ try {
         exit;
     }
 
-    $crypto->encrypt($convertedPath, $archivePath, $password);
+    // Never encrypt straight over the live archive: that deletes the only copy
+    // of the video before writing its replacement, and a failure or an
+    // interruption in that window loses it outright (Docs/PLAN.md 4.29).
+    // replace() writes beside it, proves the new archive opens and holds the
+    // same bytes, and only then swaps it in.
+    if (!$crypto->replace($convertedPath, $archivePath, $password)) {
+        // The original is untouched and still readable — the video is exactly
+        // as it was, still tagged "Not Converted", and this can be retried.
+        error_log("MyStash convert: failed to replace {$archivePath} for {$user}");
+        header('Location: video.php?id=' . urlencode($id) . '&convert_error=1');
+        exit;
+    }
 
     // The converted file is still decrypted in tmpfs here, so this is the one
     // moment the real pixel height is cheap to read — recalculate the derived
     // tags from it rather than trusting what the index carried.
     $height = $encoder->videoHeight($convertedPath);
 
+    // From here the media on disk is already converted. Everything below is
+    // bookkeeping, and it is ordered so that an interruption is survivable:
+    // the per-video metadata first, the index last (the same rule as 6.3), so
+    // a half-finished run leaves an index that still describes what is
+    // actually on disk. Worst case the video is converted but still tagged
+    // "Not Converted" — wrong on a label, not lost, and fixed by converting
+    // again.
     $index = Session::refreshIndex();
     foreach ($index['videos'] as &$video) {
         if ($video['id'] === $id) {
@@ -103,7 +121,14 @@ try {
     }
 
     Session::setIndex($index);
-    $datastore->saveIndex($user, $password, $index);
+
+    if (!$datastore->saveIndex($user, $password, $index)) {
+        // The video converted; only the index entry did not catch up. Say so
+        // rather than reporting a success the wall will not show.
+        error_log("MyStash convert: converted {$id} for {$user} but could not save the index");
+        header('Location: video.php?id=' . urlencode($id) . '&convert_error=1');
+        exit;
+    }
 } finally {
     Datastore::wipe($workDir);
 }

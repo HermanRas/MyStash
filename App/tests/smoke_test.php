@@ -61,6 +61,60 @@ step(
     file_exists($extractedFile) && hash_file('sha256', $fixture) === hash_file('sha256', $extractedFile),
 );
 
+// Crypto7z::replace() — the one that must never lose the file it is replacing
+// (Docs/PLAN.md 4.29). encrypt() deletes its destination before writing the
+// replacement; these check that replace() never leaves that hole.
+$live = $workDir . '/live.7z';
+$other = $workDir . '/other.txt';
+file_put_contents($other, 'the replacement contents');
+
+step('replace() creates an archive that did not exist yet',
+    $crypto->replace($fixture, $live, $password) && file_exists($live));
+
+step('replace() swaps in the new contents',
+    $crypto->replace($other, $live, $password));
+
+$swapped = $workDir . '/swapped';
+$crypto->extract($live, $swapped, $password);
+step('the swapped archive holds the new file, not the old one',
+    file_exists("{$swapped}/other.txt") && !file_exists("{$swapped}/1.mp4"));
+
+$litter = static fn(string $path): array => glob("{$path}.new*") ?: [];
+step('a successful replace leaves no .new or .old litter',
+    $litter($live) === [] && !file_exists("{$live}.old"));
+
+// The invariant the whole item exists for: a failed replace must leave the
+// original archive exactly as it was, still readable.
+$before = hash_file('sha256', $live);
+
+step('replace() refuses a source that is not a file',
+    $crypto->replace($workDir . '/no-such-file', $live, $password) === false);
+step('...and the original archive is untouched',
+    hash_file('sha256', $live) === $before);
+
+// The failure that actually loses videos: the encrypt itself fails after the
+// destination has been cleared. A 7z that always exits non-zero reproduces it
+// without having to fill a disk.
+$failing = new Crypto7z('/bin/false');
+step('replace() reports a failed encrypt instead of ignoring it',
+    $failing->replace($other, $live, $password) === false);
+step('...and the original archive is still there, byte for byte',
+    file_exists($live) && hash_file('sha256', $live) === $before);
+
+step('a failed replace leaves no .new or .old litter',
+    $litter($live) === [] && !file_exists("{$live}.old"));
+
+step('the original still opens after the failures',
+    $crypto->extract($live, $workDir . '/still', $password));
+
+// encrypt() is the unsafe one by design — this is what replace() exists to
+// avoid, and stating it here keeps the difference from being forgotten.
+$doomed = $workDir . '/doomed.7z';
+$crypto->encrypt($other, $doomed, $password);
+$failing->encrypt($other, $doomed, $password);
+step('encrypt() destroys its destination when it fails (hence replace())',
+    !file_exists($doomed));
+
 $encoder = new VideoEncoder();
 
 $codec = $encoder->videoCodec($fixture);

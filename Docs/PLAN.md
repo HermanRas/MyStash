@@ -91,16 +91,18 @@ All verified end-to-end via curl (edit/rename/delete/convert/tag add-delete/cate
 
   Also missing while it runs: any indication in the UI that a conversion is in progress, and any guard against starting a second one over the top of the first.
 
-- [ ] 4.29 **Conversion must never overwrite the only copy of a video.** `App/public/video_convert.php` does `$crypto->encrypt($convertedPath, $archivePath, $password)` — straight over `{ID}.mp4.enc`, with the return value unchecked and no safety copy anywhere. By the time that write starts, the decrypted original exists only in tmpfs and is wiped by the `finally`. Interrupt it — an aborted request, a container restart, a full disk, a failed encrypt that returns false and is ignored — and the video is gone, with a truncated archive standing where it used to be. The convert button is the one place in the app where a routine action can lose data outright.
+- [x] 4.29 **Nothing overwrites the only copy of anything any more** — `Crypto7z::replace()`. `encrypt()` *deletes its destination before writing the replacement*, so pointing it at a live archive opens a window where the file does not exist at all; if the write then fails, returns `false` unnoticed, or is interrupted, it never comes back. `video_convert.php` did exactly that to `{ID}.mp4.enc`, with the decrypted original existing only in tmpfs and wiped by the `finally` — the one place in the app where a routine click could lose a video outright.
 
-  Re-keying already solved exactly this in 6.2/6.4 and conversion should borrow the pattern rather than invent one:
+  `replace()` does what re-keying already did in 6.2/6.4: encrypt beside the archive under a per-call name, **verify** the result really opens and holds the same bytes (extract it and compare sha256 — an encrypt that reports success can still have truncated), swap it in, and keep the previous bytes as `.old` until the swap succeeds, restoring them if any step fails.
 
-  - **Write to a new path, never over the live one.** Encrypt to `{ID}.mp4.enc.new`, and only once that has been written successfully swap it in.
-  - **Check the encrypt succeeded**, and verify the result before trusting it — the cheapest honest check is to extract the new archive back and confirm it opens and is the expected size. A `false` return that nobody reads is how a zero-byte archive replaces a video.
-  - **Keep the previous bytes as `{ID}.mp4.enc.old`** until every step has succeeded, then remove it; on any failure, restore it and leave the video exactly as it was, still tagged `Not Converted`.
-  - **Order the writes so an interruption is survivable**: media first, then the per-video metadata, then the index — the same "index last" rule as 6.3, so a half-finished run leaves an index that still describes what is actually on disk.
+  Two callers changed, and the second matters more than the one that prompted this:
 
-  Worth doing before 4.28's background worker, not after: the worker makes conversion pleasant, this makes it safe.
+  - **`video_convert.php`** now calls `replace()` and *checks the result*. A failure leaves the video exactly as it was, still tagged `Not Converted`, and retryable. The bookkeeping after it is ordered media → per-video metadata → index (the same "index last" rule as 6.3), so an interruption leaves an index that still describes what is on disk; the worst case is a converted video still wearing the `Not Converted` label, which is wrong on a label rather than lost.
+  - **`Datastore::saveJsonArchive()`** — the single choke point through which the index and *every* metadata file is written. It had the identical bug on the most important file in the stash: an interrupted index save would have left the stash with no index at all, every video stranded. One line.
+
+  `Crypto7z` deliberately does not reach for `Datastore::tmpfsWorkDir()` for its verification scratch space — `Datastore` depends on `Crypto7z`, and that dependency should not run both ways.
+
+  Covered by smoke tests that pin the invariant (a failed `replace` leaves the original byte-for-byte intact, and leaves no `.new`/`.old` litter) including one that asserts the *old* behaviour of `encrypt()` so the difference cannot be forgotten, and by `dev/run_convert_check.sh`, which converts a real video through the real HTTP endpoint on a throwaway stash and checks it still decrypts, is now MP4/H.265, and left nothing behind.
 
 ## Phase 5 — Search, Filter, Sort, Playlists
 

@@ -235,7 +235,13 @@ final class Datastore
         try {
             file_put_contents($plainPath, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
 
-            return $this->crypto->encrypt($plainPath, $archivePath, $password);
+            // replace() rather than encrypt(): this one line is how the index
+            // and every metadata file get rewritten, and encrypt() deletes its
+            // destination before writing the replacement. An interruption in
+            // that window would leave the stash with no index at all — the
+            // whole library structure gone, videos stranded (Docs/PLAN.md
+            // 4.29). This writes beside it and swaps only a verified archive in.
+            return $this->crypto->replace($plainPath, $archivePath, $password);
         } finally {
             self::wipe($workDir);
         }
