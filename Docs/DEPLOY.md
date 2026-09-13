@@ -16,7 +16,7 @@ plaintext goes** and **what a backup is worth without the password.**
 
 | | |
 | --- | --- |
-| Docker Engine + Compose v2 | `docker compose version` should report v2.24 or newer — the production overlay uses `!override`, which is not in older versions |
+| Docker Engine + Compose v2 | `docker compose version` should report v2.24 or newer — the production overlay uses `!override` and §2 uses `!reset`, neither of which is in older versions |
 | Disk | the size of your library, plus room for one video at a time while it is being converted |
 | RAM | 2 GB free for `/dev/shm` on top of whatever else the host does (see §6) |
 | A host you trust | the password is typed into this app, held in RAM for the session, and never stored |
@@ -37,6 +37,46 @@ Then open <http://127.0.0.1:8080> and create a stash.
 
 That is a complete, working deployment **for one machine, used locally**. If
 anyone reaches it over a network, read §4 before you tell them the address.
+
+### Or pull the image instead of building it
+
+Every push to `main` builds the container, starts it, checks it serves the app
+and runs the smoke suite, and only then publishes it
+(`.github/workflows/image.yml`):
+
+```
+ghcr.io/hermanras/mystash:latest
+ghcr.io/hermanras/mystash:sha-<commit>
+```
+
+Pulling it rather than building saves a few minutes and an `ffmpeg` compile on
+a small host. It needs one change, and the change is the point: the compose
+files bind-mount `./App` over `/app`, which would put the host's copy of the
+code back on top of the image you just pulled. Use an overlay that replaces
+both:
+
+```yaml
+# docker-compose.pull.yml
+services:
+  app:
+    image: ghcr.io/hermanras/mystash:latest
+    build: !reset null
+    volumes: !override
+      - ./App/Data:/app/Data
+      - ./App/php.prod.ini:/usr/local/etc/php/conf.d/zz-mystash-prod.ini:ro
+```
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+               -f docker-compose.pull.yml pull
+docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+               -f docker-compose.pull.yml up -d
+```
+
+Note what you are trusting when you do this: an image built by GitHub from a
+commit, rather than one you built from a working tree you can see. The `sha-`
+tag exists so you can name exactly which commit is running. Building on the
+host stays the default in §2 for that reason.
 
 ---
 
@@ -283,7 +323,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 docker compose exec app php /app/tests/smoke_test.php
 ```
 
-226 checks over encryption, ingestion, querying, re-keying, playlists and the
+227 checks over encryption, ingestion, querying, re-keying, playlists and the
 injection guards. It is self-contained: the one real video it needs is
 synthesised with ffmpeg into tmpfs and thrown away afterwards, so this runs on
 a fresh clone with an empty datastore.

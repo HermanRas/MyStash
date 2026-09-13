@@ -24,7 +24,11 @@ COPY . /app
 COPY php.ini /usr/local/etc/php/conf.d/mystash.ini
 COPY php-fpm.conf /usr/local/etc/php-fpm.d/zz-mystash.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+# --chmod rather than relying on the mode in the checkout: this repository is
+# worked on from a Windows drive mount, where git has core.filemode=false and
+# records every file as 0644. The bit is set in the index too, but the image
+# must not depend on that having been remembered.
+COPY --chmod=0755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # nginx listens; php-fpm is reached over the loopback inside this container and
 # is not published anywhere.

@@ -643,6 +643,15 @@ $users = new User();
 $doomed = 'DelProbe' . bin2hex(random_bytes(3));
 $doomedKey = 'delete-probe-password-aaaaaaaa';
 
+// The stash the traversal below tries to reach past the data directory and
+// delete. It is created here rather than being assumed to exist: this check
+// used to name TestUser, which meant it failed on a fresh clone with an empty
+// datastore and — worse — would have passed vacuously on any machine where
+// that stash happened to be missing, because a directory that was never there
+// cannot be observed to survive.
+$bystander = 'DelBystander' . bin2hex(random_bytes(3));
+step("create a bystander stash ({$bystander})", $users->create($bystander, $doomedKey));
+
 step("create a throwaway stash ({$doomed})", $users->create($doomed, $doomedKey));
 
 $openable = static fn(): bool => (new Datastore())->loadIndex($doomed, $doomedKey) !== null;
@@ -657,12 +666,13 @@ step('...and the stash is still there, still opening', $openable());
 // The name is about to be the last segment of a recursive delete. It comes
 // from the session in practice, but a traversal must not be able to reach
 // past the data directory even if it ever did not.
-foreach (['../TestUser', 'Del/Probe', '..', '', 'Has Space'] as $bad) {
+foreach (["../{$bystander}", 'Del/Probe', '..', '', 'Has Space'] as $bad) {
     $refused = $users->delete($bad, $doomedKey);
     step("a name that is not letters-and-digits is refused (" . var_export($bad, true) . ")",
         $refused['ok'] === false);
 }
-step('TestUser survived every one of those', is_dir(Datastore::userDir('TestUser')));
+step("{$bystander} survived every one of those",
+    is_dir(Datastore::userDir($bystander)));
 
 $gone = $users->delete($doomed, $doomedKey);
 step('the right password deletes it (' . $gone['message'] . ')', $gone['ok'] === true);
@@ -673,7 +683,9 @@ step('deleting it twice is refused rather than pretending',
 step('the name is free to use again', $users->create($doomed, $doomedKey));
 
 Datastore::wipe(Datastore::userDir($doomed));
-step('cleaned up', !is_dir(Datastore::userDir($doomed)));
+Datastore::wipe(Datastore::userDir($bystander));
+step('cleaned up', !is_dir(Datastore::userDir($doomed))
+    && !is_dir(Datastore::userDir($bystander)));
 
 // ---------------------------------------------------------------------------
 // Changing a video's preview image (Docs/PLAN.md 3.9)

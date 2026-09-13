@@ -70,7 +70,7 @@ App/
   src/             the application: crypto, datastore, ingest, queries, jobs
   views/           the header and small shared partials
   bin/             CLI entry points — the job worker and one-off migrations
-  tests/           the smoke suite (226 checks)
+  tests/           the smoke suite (227 checks)
   Data/            the encrypted datastore — gitignored, never leaves the host
   nginx.conf       the web server's whole configuration
   php.ini          upload limits; php.prod.ini adds the production hardening
@@ -82,6 +82,7 @@ Docs/
   DEPLOY.md          how to run it for real
   Assets/            branding, icon sheets and these screenshots
 dev/                 the check scripts and the Playwright container's scripts
+.github/workflows/   CI: builds the container, proves it serves the app, publishes it
 ```
 
 Three things worth knowing about the shape:
@@ -269,7 +270,7 @@ across the site and fails if any of them leaves this origin.
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
-docker compose exec app php /app/tests/smoke_test.php     # 226 checks
+docker compose exec app php /app/tests/smoke_test.php     # 227 checks
 ```
 
 The `dev/` scripts each prove one property against real HTTP endpoints and, for

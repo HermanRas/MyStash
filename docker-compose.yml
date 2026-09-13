@@ -6,6 +6,10 @@ services:
   # and every dev/*.sh keep working.
   app:
     build: ./App
+    # Named explicitly rather than left to Compose's project-service default,
+    # so CI can build the image once and then bring this up with --no-build
+    # and know it is testing exactly the image it is about to publish.
+    image: mystash-app:latest
     ports:
       - "8080:8080"
     volumes:
