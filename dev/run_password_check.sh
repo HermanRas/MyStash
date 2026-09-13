@@ -18,7 +18,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-docker compose exec -T -u www-data php php -r '
+docker compose exec -T -u www-data app php -r '
 require "/app/src/User.php";
 exit((new MyStash\User())->create($argv[1], $argv[2]) ? 0 : 1);
 ' "${PROBE}" "${OLD}" || { echo "FAIL: could not create the throwaway stash"; exit 1; }

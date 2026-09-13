@@ -3,7 +3,7 @@
 ## 1. Tech Stack
 
 - **Backend:** PHP
-- **Runtime:** Docker container
+- **Runtime:** a single Docker container — nginx on 8080 with PHP-FPM behind it on the container's own loopback (see `App/docker-entrypoint.sh` and Docs/DEPLOY.md §3)
 - **Encryption:** 7zip (standard, well-known algorithm), password-protected archives
 - **Video processing:** PHP-driven conversion to MP4 (H.265/MPEG-H HEVC), frame extraction for previews
 - **Frontend:** HTML/CSS/JS, dark-theme UI (see §4)

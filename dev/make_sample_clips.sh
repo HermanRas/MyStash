@@ -71,14 +71,14 @@ for row in "${ROWS[@]}"; do
   esac
 
   echo "  ${name} (${size}, ${codec}, ${dur}s)"
-  $DC exec -T php sh -c "
+  $DC exec -T app sh -c "
     ffmpeg -v error -y -f lavfi -i '${base}' -f lavfi -i '${second}' \
       -filter_complex '${graph},vignette=PI/4.2,noise=alls=5:allf=t,eq=contrast=1.1:saturation=1.15,format=yuv420p[v]' \
       -map '[v]' ${enc} -an -t ${dur} /dev/shm/clip.mp4" </dev/null 2>/dev/null \
     || { echo "    FAILED"; continue; }
-  $DC exec -T php cat /dev/shm/clip.mp4 </dev/null > "${OUT}/${name}.mp4"
+  $DC exec -T app cat /dev/shm/clip.mp4 </dev/null > "${OUT}/${name}.mp4"
 done
 
-$DC exec -T php rm -f /dev/shm/clip.mp4
+$DC exec -T app rm -f /dev/shm/clip.mp4
 echo
 ls -la "$OUT"

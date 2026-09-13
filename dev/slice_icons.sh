@@ -55,7 +55,7 @@ if [ "$(basename "$SHEET")" = "icons_v3.png" ]; then
   )
 fi
 
-docker compose cp "$SHEET" php:/tmp/sheet.png >/dev/null
+docker compose cp "$SHEET" app:/tmp/sheet.png >/dev/null
 echo "slicing $(basename "$SHEET"), keying ${KEY}"
 
 for i in "${!NAMES[@]}"; do
@@ -67,12 +67,12 @@ for i in "${!NAMES[@]}"; do
   side=$(( 256 - INSET * 2 ))
 
   # 1 + 2: the cell, with the background already gone.
-  docker compose exec -T php ffmpeg -v error -y -i /tmp/sheet.png \
+  docker compose exec -T app ffmpeg -v error -y -i /tmp/sheet.png \
     -vf "crop=${side}:${side}:${x}:${y},format=rgba,colorkey=${KEY}:${TOL}" /tmp/keyed.png
 
   # 3: bounds from the alpha. cropdetect needs more than one frame before it
   # reports, which is what the loop is for.
-  BOX=$(docker compose exec -T php sh -c \
+  BOX=$(docker compose exec -T app sh -c \
     "ffmpeg -v info -loop 1 -t 0.4 -i /tmp/keyed.png -vf 'alphaextract,cropdetect=limit=0:round=2:reset=0' -f null - 2>&1 | grep -o 'crop=[0-9]*:[0-9]*:[0-9]*:[0-9]*' | tail -1")
   BOX="$(printf '%s' "${BOX#crop=}" | tr -d '\r')"
 
@@ -92,11 +92,11 @@ for i in "${!NAMES[@]}"; do
   [ $(( nx + nw )) -gt "$side" ] && nw=$(( side - nx ))
   [ $(( ny + nh )) -gt "$side" ] && nh=$(( side - ny ))
 
-  docker compose exec -T php ffmpeg -v error -y -i /tmp/keyed.png \
+  docker compose exec -T app ffmpeg -v error -y -i /tmp/keyed.png \
     -vf "crop=${nw}:${nh}:${nx}:${ny},scale='if(gt(iw,ih),96,-1)':'if(gt(iw,ih),-1,96)':flags=lanczos" \
     "/tmp/icon-${name}.png"
 
-  docker compose cp "php:/tmp/icon-${name}.png" "${OUT}/${name}.png" >/dev/null
+  docker compose cp "app:/tmp/icon-${name}.png" "${OUT}/${name}.png" >/dev/null
   printf '  %-16s %s\n' "${name}.png" "${nw}x${nh}+${nx}+${ny}"
 done
 

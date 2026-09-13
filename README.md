@@ -35,8 +35,8 @@ Everything follows from that:
 - **A forgotten password is a destroyed library.** There is no reset. This is
   the cost of the guarantee above, and it is not negotiable after the fact.
 
-It runs as two containers — nginx and PHP-FPM with `ffmpeg` and `7z` — and
-needs nothing else. No database, no queue, no cloud account, no CDN.
+It runs as one container — nginx, PHP-FPM, `ffmpeg` and `7z` — and needs
+nothing else. No database, no queue, no cloud account, no CDN.
 
 ---
 
@@ -74,6 +74,8 @@ App/
   Data/            the encrypted datastore — gitignored, never leaves the host
   nginx.conf       the web server's whole configuration
   php.ini          upload limits; php.prod.ini adds the production hardening
+  docker-entrypoint.sh   starts nginx and PHP-FPM, and takes the container
+                         down if either of them stops
 Docs/
   SPECIFICATIONS.md  what the app does and why, clause by clause
   PLAN.md            the phased build log
@@ -267,7 +269,7 @@ across the site and fails if any of them leaves this origin.
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
-docker compose exec php php /app/tests/smoke_test.php     # 226 checks
+docker compose exec app php /app/tests/smoke_test.php     # 226 checks
 ```
 
 The `dev/` scripts each prove one property against real HTTP endpoints and, for

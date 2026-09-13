@@ -34,10 +34,10 @@ post() { curl -s -b "$JAR" -c "$JAR" -o "${1}" -w '%{http_code}' "${@:2}"; }
 
 # Reads one value out of the encrypted index, so every assertion below is
 # about what was actually stored rather than what a page happened to render.
-peek() { docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" php php -r "$1"; }
+peek() { docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" app php -r "$1"; }
 
 # --- a stash with four titled videos --------------------------------------
-docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" php php -r '
+docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" app php -r '
 require_once "/app/src/User.php";
 require_once "/app/src/VideoIngest.php";
 require_once "/app/src/Datastore.php";

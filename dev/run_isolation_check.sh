@@ -25,7 +25,7 @@ check() { if [ "$2" = "0" ]; then echo "PASS: $1"; else echo "FAIL: $1"; fails=$
 
 cleanup() {
   for _ in $(seq 1 60); do
-    running=$(docker compose exec -T -u www-data php sh -c 'pgrep -fc "[j]ob_worker" || true' | tr -d '\r')
+    running=$(docker compose exec -T -u www-data app sh -c 'pgrep -fc "[j]ob_worker" || true' | tr -d '\r')
     [ "${running:-0}" = "0" ] && break
     sleep 1
   done
@@ -147,7 +147,7 @@ check "a job poll only ever sees this user's own jobs" $?
 #
 # So the refusal is proved against sacrificial directories that nothing needs:
 # if the guard is ever missing again, the only casualties are these.
-OUT=$(docker compose exec -T -u www-data php php -r '
+OUT=$(docker compose exec -T -u www-data app php -r '
 require_once "/app/src/Datastore.php";
 $outside = "/tmp/iso-sacrifice-" . bin2hex(random_bytes(4));   // not under Data, not /dev/shm
 @mkdir($outside . "/sub", 0700, true); touch($outside . "/sub/keep");
@@ -174,7 +174,7 @@ echo "$OUT" | sed 's/^/  /'
 check "Datastore::wipe() refuses every path outside the datastore, and still does its job" $?
 
 # Bad ids must never reach a path builder — and if one ever does, it throws.
-THROWS=$(docker compose exec -T -u www-data php php -r '
+THROWS=$(docker compose exec -T -u www-data app php -r '
 require_once "/app/src/Datastore.php";
 foreach (["1/../../x", "../..", "", "abc", "1;rm -rf /", str_repeat("9", 40)] as $bad) {
     try { MyStash\Datastore::videoDir("u", $bad); echo "ACCEPTED: {$bad}\n"; }

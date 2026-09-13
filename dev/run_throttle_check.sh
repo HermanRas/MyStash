@@ -16,7 +16,7 @@ check() { if [ "$2" = "0" ]; then echo "PASS: $1"; else echo "FAIL: $1"; fails=$
 
 # Every run starts from an empty counter store, and leaves one behind, so a
 # check here can never lock the developer out of their own stash.
-clear_store() { docker compose exec -T -u www-data php sh -c 'rm -rf /dev/shm/mystash-login' >/dev/null 2>&1; }
+clear_store() { docker compose exec -T -u www-data app sh -c 'rm -rf /dev/shm/mystash-login' >/dev/null 2>&1; }
 
 cleanup() {
   rm -rf "App/Data/${PROBE}" "/tmp/${PROBE}".*
@@ -100,12 +100,12 @@ check "the page is told how many minutes to wait" $?
 # --- the lock lets go on its own -----------------------------------------
 # Nothing here may be permanent: the password is the only key there is, so a
 # lockout that outlived its window would mean no way back in, ever.
-docker compose exec -T -u www-data php php -r '
+docker compose exec -T -u www-data app php -r '
 require_once "/app/src/LoginThrottle.php";
 printf("window is %d seconds (%d minutes)\n",
     MyStash\LoginThrottle::WINDOW_SECONDS, MyStash\LoginThrottle::WINDOW_SECONDS / 60);
 ' | sed 's/^/  /'
-docker compose exec -T -u www-data php php -r '
+docker compose exec -T -u www-data app php -r '
 require_once "/app/src/LoginThrottle.php";
 exit(MyStash\LoginThrottle::WINDOW_SECONDS > 0 && MyStash\LoginThrottle::WINDOW_SECONDS <= 1800 ? 0 : 1);
 '

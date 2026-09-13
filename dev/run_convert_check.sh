@@ -25,7 +25,7 @@ cleanup() {
   # 7zip creates missing parent directories, so a convert finishing after the
   # rm leaves a half-resurrected stash behind. That has actually happened here.
   for _ in $(seq 1 60); do
-    running=$(docker compose exec -T -u www-data php sh -c 'pgrep -fc "[j]ob_worker" || true' | tr -d "\r")
+    running=$(docker compose exec -T -u www-data app sh -c 'pgrep -fc "[j]ob_worker" || true' | tr -d "\r")
     [ "${running:-0}" = "0" ] && break
     sleep 1
   done
@@ -38,7 +38,7 @@ cleanup() {
 trap cleanup EXIT
 
 # --- a stash with one real, unconverted video -----------------------------
-docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" php php -r '
+docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" app php -r '
 require_once "/app/src/User.php";
 require_once "/app/src/VideoEncoder.php";
 require_once "/app/src/VideoCategories.php";
@@ -58,7 +58,7 @@ echo "ingested video {$entry["id"]}, not_converted=", var_export($entry["not_con
 ' || { echo "FAIL: could not build the throwaway stash"; fails=1; exit 1; }
 
 # The bytes we must still have afterwards, whatever happens.
-BEFORE=$(docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" php php -r '
+BEFORE=$(docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" app php -r '
 require_once "/app/src/Crypto7z.php";
 $c = new MyStash\Crypto7z();
 $c->extract("/app/Data/" . getenv("U") . "/videos/Video1/1.mp4.enc", "/dev/shm/before", getenv("P"));
@@ -90,7 +90,7 @@ echo "  wall.php answered in ${WALL_MS}ms while the conversion was running"
 # video, so the second press finds the first job instead of launching another.
 # (The pattern is bracketed so pgrep does not count the shell running it.)
 curl -s -b "$JAR" -o /dev/null -d "id=1" http://localhost:8080/video_convert.php
-WORKERS=$(docker compose exec -T -u www-data php sh -c 'pgrep -fc "[j]ob_worker" || true' | tr -d "\r")
+WORKERS=$(docker compose exec -T -u www-data app sh -c 'pgrep -fc "[j]ob_worker" || true' | tr -d "\r")
 echo "  job_worker processes after a second press: ${WORKERS:-0}"
 [ "${WORKERS:-0}" -le 1 ]; check "a second Convert press does not start a second worker" $?
 
@@ -110,7 +110,7 @@ echo "  job ended in state '${STATE}', highest reported progress ${PEAK}%"
 [ "$STATE" = "done" ]; check "the job finishes successfully" $?
 
 # --- the video must still be there, and now be MP4/H.265 ------------------
-docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" -e B="$BEFORE" php php -r '
+docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" -e B="$BEFORE" app php -r '
 require_once "/app/src/Crypto7z.php";
 require_once "/app/src/VideoEncoder.php";
 require_once "/app/src/Datastore.php";

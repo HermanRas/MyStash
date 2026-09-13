@@ -15,7 +15,7 @@ ensure_fixture() {
   [ -f "$FIXTURE" ] && return 0
 
   echo "generating $FIXTURE (once)"
-  docker compose exec -T php sh -c "
+  docker compose exec -T app sh -c "
     ffmpeg -v error -y -f lavfi -i testsrc=size=640x360:rate=25:duration=20 \
       -f lavfi -i sine=frequency=440:duration=20 \
       -c:v libx264 -preset veryfast -c:a aac -pix_fmt yuv420p -shortest \

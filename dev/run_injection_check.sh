@@ -25,7 +25,7 @@ fails=0
 
 check() { if [ "$2" = "0" ]; then echo "PASS: $1"; else echo "FAIL: $1"; fails=$((fails+1)); fi; }
 
-incontainer() { docker compose exec -T -u www-data php sh -c "$1" | tr -d '\r'; }
+incontainer() { docker compose exec -T -u www-data app sh -c "$1" | tr -d '\r'; }
 
 cleanup() {
   for _ in $(seq 1 60); do

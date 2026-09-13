@@ -23,7 +23,7 @@ cleanup() {
   # Same reason as run_convert_check.sh: a worker still running would recreate
   # part of what is about to be removed, because 7zip creates missing parents.
   for _ in $(seq 1 60); do
-    running=$($DC exec -T -u www-data php sh -c 'pgrep -fc "[j]ob_worker" || true' | tr -d "\r")
+    running=$($DC exec -T -u www-data app sh -c 'pgrep -fc "[j]ob_worker" || true' | tr -d "\r")
     [ "${running:-0}" = "0" ] && break
     sleep 1
   done
@@ -40,7 +40,7 @@ $DC exec -T -e NODE_PATH=/opt/pwlib/node_modules playwright node /work/check_lay
 fails=$((fails + $?))
 
 # --- a throwaway stash with one unconverted video -------------------------
-$DC exec -T -u www-data -e U="$PROBE" -e P="$PASS" php php -r '
+$DC exec -T -u www-data -e U="$PROBE" -e P="$PASS" app php -r '
 require_once "/app/src/User.php";
 require_once "/app/src/VideoEncoder.php";
 require_once "/app/src/VideoCategories.php";

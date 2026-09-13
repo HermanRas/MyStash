@@ -1,9 +1,10 @@
 # Deploying MyStash
 
-MyStash is a two-container application: nginx on port 8080 and PHP-FPM behind
-it, with `ffmpeg` and `7z` in the PHP image. There is no database, no queue and
-no external service — the whole of a user's data is encrypted files under
-`App/Data`, and the whole of the runtime state is in `/dev/shm`.
+MyStash is a single container: nginx on port 8080 with PHP-FPM behind it on
+the container's own loopback, and `ffmpeg` and `7z` alongside them. There is no
+database, no queue and no external service — the whole of a user's data is
+encrypted files under `App/Data`, and the whole of the runtime state is in
+`/dev/shm`.
 
 That shape makes deployment short. It also concentrates every risk in two
 places, so this document spends most of its length on those: **where the
@@ -45,7 +46,7 @@ There are three compose files and they layer:
 
 | File | What it adds |
 | --- | --- |
-| `docker-compose.yml` | the app itself: nginx, PHP-FPM, the 2 GB `/dev/shm` |
+| `docker-compose.yml` | the app itself: the one `app` container, port 8080, the 2 GB `/dev/shm` |
 | `docker-compose.prod.yml` | loopback-only port, read-only code, `restart: unless-stopped`, `App/php.prod.ini` |
 | `docker-compose.dev.yml` | the Playwright container the `dev/` checks drive |
 
@@ -63,6 +64,27 @@ The base file on its own is the development configuration: the port is
 published on every interface, the code is mounted writable, and PHP renders
 its errors to the browser. That last one is the reason the overlay exists.
 
+### One container, two processes
+
+nginx and php-fpm run side by side inside the `app` container, started by
+`App/docker-entrypoint.sh`. nginx reaches php-fpm on `127.0.0.1:9000`, which is
+not published and not on the compose network — nothing outside the container
+can speak FastCGI to it at all.
+
+They are together because they are not independently useful: nginx here serves
+one document root, out of the same files php-fpm executes, and neither is ever
+restarted or scaled without the other.
+
+The entrypoint exits as soon as *either* process does, which is deliberate. The
+failure worth guarding against is half a container — nginx still answering on
+8080 while php-fpm is dead, so every page is a 502 and `docker compose ps`
+reports the service as up. Instead the container exits, and
+`restart: unless-stopped` brings the whole thing back.
+
+Both processes log to the container's stdout/stderr, so `docker compose logs -f
+app` is the access log, the nginx error log and PHP's `error_log()` interleaved
+in one stream.
+
 ### What the production overlay actually changes
 
 **PHP stops talking to the browser.** A fatal error renders a stack trace, and
@@ -73,7 +95,7 @@ instead, and sets `zend.exception_ignore_args = 1` so the log does not collect
 what the page no longer shows. Verify it:
 
 ```bash
-docker compose exec php php -i | grep -E '^display_errors|^zend.exception_ignore_args'
+docker compose exec app php -i | grep -E '^display_errors|^zend.exception_ignore_args'
 ```
 
 **The code is mounted read-only.** Only `App/Data` is writable. Every
@@ -214,14 +236,17 @@ does.
 rest, which makes backing it up unusually simple and unusually unforgiving:
 
 ```bash
-docker compose stop php          # so nothing is mid-write
+docker compose stop app          # so nothing is mid-write
 tar -czf mystash-$(date +%F).tar.gz App/Data
-docker compose start php
+docker compose start app
 ```
 
 - **Back up while nothing is writing.** A backup taken during an upload or a
-  re-key can catch a half-written archive. Stopping PHP for the duration is
-  the cheap way to be sure.
+  re-key can catch a half-written archive. Stopping the container for the
+  duration is the cheap way to be sure — and `docker compose stop app` is a
+  clean stop: the entrypoint signals nginx and php-fpm to finish, and the
+  container is down in under a second rather than being killed after Docker's
+  ten-second grace period.
 - **The password is not in the backup and cannot be recovered from it.** A
   backup of a stash whose password is forgotten is a folder of noise. Whatever
   you use to remember passwords, that is the other half of this backup.
@@ -255,7 +280,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ## 9. Verifying an install
 
 ```bash
-docker compose exec php php /app/tests/smoke_test.php
+docker compose exec app php /app/tests/smoke_test.php
 ```
 
 226 checks over encryption, ingestion, querying, re-keying, playlists and the

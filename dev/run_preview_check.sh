@@ -24,7 +24,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-$DC exec -T -u www-data -e U="$PROBE" -e P="$PASS" php php -r '
+$DC exec -T -u www-data -e U="$PROBE" -e P="$PASS" app php -r '
 require_once "/app/src/User.php";
 require_once "/app/src/VideoEncoder.php";
 require_once "/app/src/VideoCategories.php";

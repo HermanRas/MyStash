@@ -88,7 +88,7 @@ upload() { # file title description creators... (pipe-separated) views cat1@ts c
       "$BASE/video_category_add.php"
   done
 
-  docker compose exec -T -u www-data php \
+  docker compose exec -T -u www-data app \
     php /app/bin/set_views.php "$USER_NAME" "$PASSWORD" "$ID" "$views" >/dev/null
   echo "  [$ID] $title"
 }

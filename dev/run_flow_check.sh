@@ -35,7 +35,7 @@ cleanup() {
   # The failed registrations below land in the address bucket, which behind
   # this proxy is shared with every real login (7.3). Leaving them counted
   # would spend part of Herman's allowance on a test run.
-  docker compose exec -T -u www-data php sh -c 'rm -rf /dev/shm/mystash-login' >/dev/null 2>&1
+  docker compose exec -T -u www-data app sh -c 'rm -rf /dev/shm/mystash-login' >/dev/null 2>&1
   echo "removed throwaway stash ${PROBE}"
   [ "$fails" = "0" ] && echo "run_flow_check: all passed" || echo "run_flow_check: ${fails} failed"
   exit "$fails"
@@ -79,7 +79,7 @@ check "§2.1 registration logs straight in and lands on the wall" $?
 
 # "holding an empty video list, a default creator and a Not Converted category
 # (both of which ingestion relies on)"
-docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" php php -r '
+docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" app php -r '
 require_once "/app/src/Datastore.php";
 $i = (new MyStash\Datastore())->loadIndex(getenv("U"), getenv("P"));
 printf("%s: §2.1 the new stash opens with the registered password\n", $i !== null ? "PASS" : "FAIL");
@@ -123,7 +123,7 @@ for f in 1.mp4.enc 1.mp4.preview.enc 1.jpg.preview.enc 1.json.enc; do
   check "§3 the upload wrote ${f}" $?
 done
 
-docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" php php -r '
+docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" app php -r '
 require_once "/app/src/Datastore.php";
 require_once "/app/src/VideoCategories.php";
 require_once "/app/src/VideoCreators.php";
@@ -159,7 +159,7 @@ fails=$((fails + $(grep -c '^FAIL' "/tmp/${PROBE}.o2")))
 # about it." Posting them must change nothing.
 post /dev/null -d "id=1&title=Renamed&description=&quality=8K&not_converted=0" \
   http://localhost:8080/video_save.php >/dev/null
-docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" php php -r '
+docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" app php -r '
 require_once "/app/src/Datastore.php";
 $v = ((new MyStash\Datastore())->loadIndex(getenv("U"), getenv("P"))["videos"] ?? [])[0];
 printf("%s: §2.3 the save did take the title (%s)\n", $v["title"] === "Renamed" ? "PASS" : "FAIL", $v["title"]);
@@ -200,7 +200,7 @@ check "§2.2 the watch page holds the video back until play is pressed" $?
 echo "--- §2.3 Views ---"
 
 curl -s -b "$JAR" -o /dev/null "http://localhost:8080/video.php?id=1"
-docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" php php -r '
+docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" app php -r '
 require_once "/app/src/Datastore.php";
 $v = ((new MyStash\Datastore())->loadIndex(getenv("U"), getenv("P"))["videos"] ?? [])[0];
 printf("%s: §2.3 opening the watch page does not count a view (%d)\n",
@@ -210,7 +210,7 @@ fails=$((fails + $(grep -c '^FAIL' "/tmp/${PROBE}.o4")))
 
 # The player posts this from its "playing" event.
 curl -s -b "$JAR" -o /dev/null -d "id=1" http://localhost:8080/video_view.php
-docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" php php -r '
+docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" app php -r '
 require_once "/app/src/Datastore.php";
 $u = getenv("U"); $p = getenv("P");
 $store = new MyStash\Datastore();
@@ -237,7 +237,7 @@ curl -s -b "$JAR" -o /dev/null -d "id=1&name=Highlights&timestamp=00:00:30" http
 # "categories can't be invented ad hoc per video"
 curl -s -b "$JAR" -o /dev/null -d "id=1&name=NotAGlobalCategory&timestamp=00:00:05" http://localhost:8080/video_category_add.php
 
-docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" php php -r '
+docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" app php -r '
 require_once "/app/src/VideoCategories.php";
 $a = (new MyStash\VideoCategories())->load(getenv("U"), getenv("P"), "1");
 $h = array_values(array_filter($a, fn($x) => $x["name"] === "Highlights"));
@@ -255,7 +255,7 @@ fails=$((fails + $(grep -c '^FAIL' "/tmp/${PROBE}.o6")))
 # "Removing a global category only retires the definition ... videos already
 # tagged with it keep their tags."
 curl -s -b "$JAR" -o /dev/null -d "name=Highlights" http://localhost:8080/category_delete.php
-docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" php php -r '
+docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" app php -r '
 require_once "/app/src/Datastore.php";
 require_once "/app/src/VideoCategories.php";
 $u = getenv("U"); $p = getenv("P");
