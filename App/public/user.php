@@ -32,6 +32,9 @@ $errors = [
     'wrong' => 'That is not your current password.',
     'same' => 'The new password is the same as your current one.',
     'running' => 'A re-encryption is already running for this stash.',
+    'name' => 'That is not your stash name — nothing was deleted.',
+    'busy' => 'Something is still running on this stash. Wait for it to finish, then try again.',
+    'deletefailed' => 'The stash could not be deleted. Nothing else changed.',
 ];
 
 $navActive = '';
@@ -137,6 +140,42 @@ $navActive = '';
       is unreadable.
     </p>
   </div>
+
+  <?php /* Last on the page, behind its own heading, and deliberately not
+           beside anything routine. */ ?>
+  <div class="section-title danger-title">Delete This Stash</div>
+
+  <div class="card danger-card">
+    <p class="hint" style="margin-top:0;">
+      This deletes <strong><?= htmlspecialchars(Session::user(), ENT_QUOTES) ?></strong> and
+      everything in it — <?= $videoCount ?> video<?= $videoCount === 1 ? '' : 's' ?>,
+      <?= $creatorCount ?> creator<?= $creatorCount === 1 ? '' : 's' ?>, the index, all of it.
+    </p>
+    <p class="hint">
+      <strong>There is no undo.</strong> A stash is its directory and its password;
+      there is no account record to disable instead, no copy kept anywhere, and
+      nothing to restore from. If you want any of these videos, download them first.
+    </p>
+
+    <form action="stash_delete.php" method="post" id="delete-form">
+      <div class="field">
+        <label for="confirm-name">Type <code><?= htmlspecialchars(Session::user(), ENT_QUOTES) ?></code> to confirm</label>
+        <input type="text" id="confirm-name" name="confirm_name" autocomplete="off"
+               spellcheck="false" data-expected="<?= htmlspecialchars(Session::user(), ENT_QUOTES) ?>" required>
+      </div>
+      <div class="field">
+        <label for="delete-password">Your password</label>
+        <input type="password" id="delete-password" name="current_password"
+               autocomplete="current-password" required>
+        <p class="hint" style="margin:6px 0 0;">
+          Checked by opening the stash with it, the same way logging in is.
+        </p>
+      </div>
+      <button type="submit" class="btn block danger" id="delete-submit" disabled>
+        Delete This Stash Permanently
+      </button>
+    </form>
+  </div>
   <?php endif; ?>
 </main>
 
@@ -173,6 +212,26 @@ $navActive = '';
       const button = form.querySelector('button[type="submit"]');
       button.disabled = true;
       button.textContent = 'Starting…';
+    });
+  }
+
+  // The delete button stays disabled until the name matches exactly. The
+  // server checks it too — this just means the button cannot be hit by
+  // accident on the way past.
+  const deleteForm = document.getElementById('delete-form');
+
+  if (deleteForm) {
+    const typed = document.getElementById('confirm-name');
+    const deleteButton = document.getElementById('delete-submit');
+
+    typed.addEventListener('input', () => {
+      deleteButton.disabled = typed.value !== typed.dataset.expected;
+    });
+
+    deleteForm.addEventListener('submit', (event) => {
+      if (!confirm(`Delete the ${typed.dataset.expected} stash and every video in it? This cannot be undone.`)) {
+        event.preventDefault();
+      }
     });
   }
 </script>

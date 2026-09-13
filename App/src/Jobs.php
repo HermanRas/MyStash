@@ -271,6 +271,32 @@ final class Jobs
     }
 
     /**
+     * The kind of job this user currently has running, or null if none is.
+     *
+     * Needed because job ids are hashes of what the job is about, so there is
+     * no way to ask "does this user have anything running" other than to look
+     * at the records. Deleting a stash out from under a running worker would
+     * let it write files back into the directory just removed — 7zip creates
+     * missing parents — leaving a half-resurrected stash behind.
+     */
+    public static function aliveFor(string $user): ?string
+    {
+        foreach (glob(self::ROOT . '/*.json') ?: [] as $path) {
+            $record = json_decode((string) file_get_contents($path), true);
+
+            if (!is_array($record) || ($record['user'] ?? '') !== $user) {
+                continue;
+            }
+
+            if (self::isAlive(basename($path, '.json'))) {
+                return (string) ($record['kind'] ?? 'unknown');
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @param array<string, mixed> $fields
      */
     public static function update(string $id, array $fields): void

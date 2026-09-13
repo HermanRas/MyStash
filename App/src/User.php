@@ -86,4 +86,60 @@ final class User
             'videos' => [],
         ]);
     }
+
+    /**
+     * Deletes a stash and everything in it — every video, every creator, the
+     * index, the directory (Docs/PLAN.md 7.0.2).
+     *
+     * This is the most destructive thing the application can do and there is
+     * no undo: a user *is* their directory, so there is nothing left over to
+     * restore from and no account record to disable instead. Two things guard
+     * it, and they guard different mistakes:
+     *
+     *  - the caller checks that the user typed their own name, which is what
+     *    stops a mis-click;
+     *  - this checks the password the only authoritative way there is, by
+     *    decrypting the index with it, which is what stops someone who has
+     *    walked up to an unlocked session.
+     *
+     * The second is deliberately not "compare against the session password".
+     * No password is stored anywhere to compare against, and a stash that
+     * cannot be opened is not one this code should be deleting.
+     *
+     * @return array{ok: bool, message: string}
+     */
+    public function delete(string $name, string $password): array
+    {
+        // The name comes from the session, but it is about to be the last path
+        // segment of a recursive delete, so it is re-checked here rather than
+        // trusted. Letters and digits cannot traverse anywhere.
+        if (!self::isValidName($name)) {
+            return ['ok' => false, 'message' => 'That is not a valid stash name — nothing was deleted.'];
+        }
+
+        if (!$this->exists($name)) {
+            return ['ok' => false, 'message' => "There is no stash called {$name}."];
+        }
+
+        if ($this->datastore->loadIndex($name, $password) === null) {
+            return [
+                'ok' => false,
+                'message' => "That password does not open {$name}'s stash — nothing was deleted.",
+            ];
+        }
+
+        $directory = Datastore::userDir($name);
+        Datastore::wipe($directory);
+
+        // wipe() skips what it cannot remove rather than throwing, so a stash
+        // reported as deleted is one that is actually gone.
+        if (is_dir($directory)) {
+            return [
+                'ok' => false,
+                'message' => "{$name}'s stash could not be fully removed. Some of it may still be on disk.",
+            ];
+        }
+
+        return ['ok' => true, 'message' => "Deleted {$name}'s stash."];
+    }
 }

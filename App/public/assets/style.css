@@ -1111,3 +1111,34 @@ select option {
     margin: 0;
   }
 }
+
+/* ---------- Danger zone (PLAN 7.0.2) ----------
+   Deleting a stash is irreversible and there is nothing to restore from, so it
+   does not get to look like the rest of the form furniture. */
+.danger-title {
+  color: #cc4444;
+}
+
+.danger-card {
+  border-color: #6b2020;
+}
+
+.btn.danger {
+  background: #cc4444;
+  border-color: #cc4444;
+  color: #fff;
+}
+
+.btn.danger:hover:not(:disabled) {
+  background: #b03636;
+  border-color: #b03636;
+}
+
+/* Disabled until the name is typed exactly — it should read as unavailable
+   rather than merely unstyled. */
+.btn.danger:disabled {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}

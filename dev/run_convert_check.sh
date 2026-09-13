@@ -17,6 +17,15 @@ fails=0
 check() { if [ "$2" = "0" ]; then echo "PASS: $1"; else echo "FAIL: $1"; fails=$((fails+1)); fi; }
 
 cleanup() {
+  # A worker still running would recreate part of what is about to be removed:
+  # 7zip creates missing parent directories, so a convert finishing after the
+  # rm leaves a half-resurrected stash behind. That has actually happened here.
+  for _ in $(seq 1 60); do
+    running=$(docker compose exec -T -u www-data php sh -c 'pgrep -fc "[j]ob_worker" || true' | tr -d "\r")
+    [ "${running:-0}" = "0" ] && break
+    sleep 1
+  done
+
   rm -rf "App/Data/${PROBE}" "$JAR"
   echo "removed throwaway stash ${PROBE}"
   [ "$fails" = "0" ] && echo "run_convert_check: all passed" || echo "run_convert_check: ${fails} failed"

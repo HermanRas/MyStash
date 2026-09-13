@@ -16,6 +16,7 @@
 
     <p class="hint" id="login-error" hidden style="color:#ff6b6b;">Incorrect username or password.</p>
     <p class="hint" id="login-stale" hidden style="color:#ffa31a;">Your session ended: this stash's password was changed elsewhere. Sign in with the new password.</p>
+    <p class="hint" id="login-deleted" hidden style="color:#ffa31a;">Your stash has been deleted. Nothing of it remains — the name is free to use again.</p>
 
     <form action="login.php" method="post">
       <div class="field">
@@ -34,7 +35,13 @@
   </div>
 </div>
 <script>
-  const error = new URLSearchParams(location.search).get('error');
+  const params = new URLSearchParams(location.search);
+
+  if (params.has('deleted')) {
+    document.getElementById('login-deleted').hidden = false;
+  }
+
+  const error = params.get('error');
   if (error === 'stale') {
     document.getElementById('login-stale').hidden = false;
   } else if (error !== null) {

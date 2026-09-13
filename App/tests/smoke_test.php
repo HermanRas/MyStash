@@ -527,14 +527,19 @@ step(
     !str_contains((string) json_encode($record), 'the-secret-key-nobody-may-see'),
 );
 
-// Give the worker its moment to run and report.
-for ($waited = 0; $waited < 100; $waited++) {
-    $record = Jobs::read($jobId);
-    if (($record['state'] ?? '') !== Jobs::RUNNING) {
-        break;
+// Give the worker its moment to run and report. `waitFor` rather than a fixed
+// sleep: this machine may be busy, and a test that depends on a spawned
+// process being quick is a test that fails for no reason.
+$waitFor = static function (callable $done, float $seconds = 30.0): void {
+    $deadline = microtime(true) + $seconds;
+
+    while (microtime(true) < $deadline && !$done()) {
+        usleep(50_000);
     }
-    usleep(100_000);
-}
+};
+
+$waitFor(static fn(): bool => (Jobs::read($jobId)['state'] ?? '') !== Jobs::RUNNING);
+$record = Jobs::read($jobId);
 
 step('the worker ran and reported an outcome (' . ($record['state'] ?? '?') . ')',
     ($record['state'] ?? '') === Jobs::FAILED);
@@ -544,6 +549,12 @@ step(
     'the key file is destroyed once the worker has read it',
     !file_exists(Jobs::ROOT . '/' . $jobId . '.key'),
 );
+// Writing the outcome and exiting are two separate moments: the record is
+// written from inside the worker, which is still holding its lock for the
+// instant it takes to return. Waiting for the lock is the assertion — that it
+// is released *when the worker exits*, not that it has already gone the
+// microsecond the record appeared.
+$waitFor(static fn(): bool => !Jobs::isAlive($jobId));
 step('the lock is released when the worker exits', !Jobs::isAlive($jobId));
 
 // A worker killed outright leaves a record that still says "running" forever.
@@ -562,6 +573,20 @@ step(
     ($abandoned['state'] ?? '') === Jobs::FAILED && $abandoned['alive'] === false,
 );
 
+// aliveFor() is what stops a stash being deleted out from under a running
+// worker (7.0.2), and job ids are hashes, so it has to find a job by reading
+// the records rather than by computing an id. Holding the lock here stands in
+// for a worker holding it.
+$held = Jobs::hold($jobId);
+step('aliveFor finds a job that is holding its lock', Jobs::aliveFor($jobUser) === 'probe');
+step('...and does not report it against a different user', Jobs::aliveFor('SomeoneElse') === null);
+
+if ($held !== false) {
+    fclose($held);
+}
+
+step('...and stops finding it once the lock is gone', Jobs::aliveFor($jobUser) === null);
+
 Jobs::forget($jobId);
 step('forgetting a job removes its record', Jobs::read($jobId) === null);
 
@@ -577,5 +602,51 @@ step(
         return false;
     })(),
 );
+
+
+// ---------------------------------------------------------------------------
+// Deleting a stash (Docs/PLAN.md 7.0.2)
+//
+// Every refusal below has to leave the stash completely intact — this is the
+// one operation in the app with nothing to restore from.
+// ---------------------------------------------------------------------------
+
+echo PHP_EOL . "-- deleting a stash --" . PHP_EOL;
+
+$users = new User();
+$doomed = 'DelProbe' . bin2hex(random_bytes(3));
+$doomedKey = 'delete-probe-password-aaaaaaaa';
+
+step("create a throwaway stash ({$doomed})", $users->create($doomed, $doomedKey));
+
+$openable = static fn(): bool => (new Datastore())->loadIndex($doomed, $doomedKey) !== null;
+step('...and it opens', $openable());
+
+$wrong = $users->delete($doomed, 'this-is-not-the-password-aaaa');
+step('a wrong password is refused', $wrong['ok'] === false);
+step('...and says so without naming what it protects (' . $wrong['message'] . ')',
+    str_contains($wrong['message'], 'nothing was deleted'));
+step('...and the stash is still there, still opening', $openable());
+
+// The name is about to be the last segment of a recursive delete. It comes
+// from the session in practice, but a traversal must not be able to reach
+// past the data directory even if it ever did not.
+foreach (['../TestUser', 'Del/Probe', '..', '', 'Has Space'] as $bad) {
+    $refused = $users->delete($bad, $doomedKey);
+    step("a name that is not letters-and-digits is refused (" . var_export($bad, true) . ")",
+        $refused['ok'] === false);
+}
+step('TestUser survived every one of those', is_dir(Datastore::userDir('TestUser')));
+
+$gone = $users->delete($doomed, $doomedKey);
+step('the right password deletes it (' . $gone['message'] . ')', $gone['ok'] === true);
+step('the directory is actually gone', !is_dir(Datastore::userDir($doomed)));
+step('...and it no longer opens', !$openable());
+step('deleting it twice is refused rather than pretending',
+    $users->delete($doomed, $doomedKey)['ok'] === false);
+step('the name is free to use again', $users->create($doomed, $doomedKey));
+
+Datastore::wipe(Datastore::userDir($doomed));
+step('cleaned up', !is_dir(Datastore::userDir($doomed)));
 
 echo PHP_EOL . "All smoke tests passed." . PHP_EOL;
