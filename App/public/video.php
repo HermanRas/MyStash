@@ -79,18 +79,37 @@ $navActive = 'videos';
 
 <main class="watch-layout">
   <div>
+    <?php /* The conversion progress and any failure from the last attempt lead
+             the page. They used to sit below the player and the action row,
+             which put the one thing the user pressed a button to watch below
+             the fold on a short window — easy to miss entirely, and the page
+             then looked as though nothing had happened. */ ?>
+    <?php if ($converting): ?>
+      <div class="card job-card indeterminate" id="job-card"
+           data-kind="convert" data-target="<?= htmlspecialchars($id, ENT_QUOTES) ?>">
+        <div class="section-title" style="margin-top:0;">Converting to MP4/H.265</div>
+        <div class="progress"><div class="progress-bar" id="job-bar"></div></div>
+        <p class="hint job-message" id="job-message">
+          <?= htmlspecialchars((string) $convertJob['message'], ENT_QUOTES) ?>
+        </p>
+        <p class="hint">
+          This runs in the background. You can leave this page, keep browsing,
+          or close the tab — it carries on, and the video stays exactly as it
+          is until the converted copy has been written and verified.
+        </p>
+      </div>
+    <?php elseif ($convertJob !== null && $convertJob['state'] === Jobs::FAILED): ?>
+      <p class="hint" style="color:#ff6b6b;">
+        <?= htmlspecialchars((string) $convertJob['message'], ENT_QUOTES) ?>
+      </p>
+    <?php endif; ?>
+
     <h1 class="watch-title"><?= htmlspecialchars($video['title'], ENT_QUOTES) ?></h1>
 
     <div class="player" id="player" data-video-src="media.php?id=<?= urlencode($id) ?>&amp;type=video">
       <img src="media.php?id=<?= urlencode($id) ?>&amp;type=thumb" alt="" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover;" onerror="this.style.display='none'">
       <button type="button" id="player-play" style="position:relative; z-index:1; background:rgba(0,0,0,0.6); border:1px solid var(--border); color:#fff; border-radius:50%; width:64px; height:64px; font-size:20px; cursor:pointer;">▶</button>
     </div>
-
-    <?php if (!$converting && $convertJob !== null && $convertJob['state'] === Jobs::FAILED): ?>
-      <p class="hint" style="color:#ff6b6b;">
-        <?= htmlspecialchars((string) $convertJob['message'], ENT_QUOTES) ?>
-      </p>
-    <?php endif; ?>
 
     <div class="watch-meta">
       <span id="view-count"><?= (int) $video['views'] ?></span>
@@ -153,22 +172,6 @@ $navActive = 'videos';
           </form>
         <?php endif; ?>
       </div>
-
-      <?php if ($converting): ?>
-        <div class="card job-card indeterminate" id="job-card"
-             data-kind="convert" data-target="<?= htmlspecialchars($id, ENT_QUOTES) ?>">
-          <div class="section-title" style="margin-top:0;">Converting to MP4/H.265</div>
-          <div class="progress"><div class="progress-bar" id="job-bar"></div></div>
-          <p class="hint job-message" id="job-message">
-            <?= htmlspecialchars((string) $convertJob['message'], ENT_QUOTES) ?>
-          </p>
-          <p class="hint">
-            This runs in the background. You can leave this page, keep browsing,
-            or close the tab — it carries on, and the video stays exactly as it
-            is until the converted copy has been written and verified.
-          </p>
-        </div>
-      <?php endif; ?>
 
       <div class="section-title">Description</div>
       <p class="tile-stats" style="font-size:13px; color:#ccc;">

@@ -1,5 +1,7 @@
 # MyStash
 
+![MyStash](Docs/Assets/Banner.jpg)
+
 A private, self-hosted video and Creator wall for personal media libraries — before anything gets uploaded to a public platform.
 
 ## What it is

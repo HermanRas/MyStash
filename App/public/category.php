@@ -38,10 +38,10 @@ $navActive = 'categories';
 
 <?php require __DIR__ . '/../views/header.php'; ?>
 
-<h1 class="page-title">Categories</h1>
+<main class="manage-layout">
+  <h1 class="page-title">Categories</h1>
 
-<main class="container">
-  <div class="card" style="max-width:560px;">
+  <div class="card">
     <p class="hint" style="margin-top:0;">
       Categories are global: defined once here, then assigned to videos (with a
       timestamp) from a video's edit screen. They also populate the wall's filter

@@ -1052,6 +1052,22 @@ select option {
   padding: 0 24px;
 }
 
+/* The management screens — Creators and Categories, both reached from the user
+   dropdown — share the watch page's column: capped and centred, so the content
+   sits in the middle of the window instead of hugging the left edge with all
+   the slack on one side (4.26). The page title goes *inside* it rather than
+   above it, or the heading and the content it heads would line up differently.
+   Hence no padding here: .page-title brings its own. */
+.manage-layout {
+  max-width: 1100px;
+  margin-inline: auto;
+  padding: 24px;
+}
+
+.manage-layout > .page-title {
+  padding: 0;
+}
+
 /* ---------- Background job progress (PLAN 4.28, 6.6) ---------- */
 
 .progress {

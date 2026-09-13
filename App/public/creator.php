@@ -97,9 +97,9 @@ $headerActions = '<a class="icon-btn" href="creator.php?edit="><img class="btn-i
 
 <?php require __DIR__ . '/../views/header.php'; ?>
 
-<h1 class="page-title">Creators</h1>
+<main class="manage-layout">
+  <h1 class="page-title">Creators</h1>
 
-<main class="container">
   <?php /* Sort lives here (5.9); the search (5.8) is the site's single box up
            in the header, pointed at this page. */ ?>
   <div class="wall-toolbar">
@@ -158,7 +158,7 @@ $headerActions = '<a class="icon-btn" href="creator.php?edit="><img class="btn-i
 
   <?php if ($editing !== null): ?>
     <div class="section-title"><?= $editCreator ? 'Edit Creator' : 'Add Creator' ?></div>
-    <div class="card" style="max-width:480px;">
+    <div class="card">
       <?php if ($editCreator): ?>
         <?php $tally = videoCount($videos, $editing); $watched = viewCount($videos, $editing); ?>
         <p class="hint" style="margin:0 0 14px;">
