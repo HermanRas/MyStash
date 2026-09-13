@@ -18,6 +18,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # in conf.d, which nginx.conf also includes.
 RUN rm -f /etc/nginx/sites-enabled/default
 
+# GHCR links a package to a repository by this label, and a package that is not
+# linked to one is a package the repository's GITHUB_TOKEN cannot write to —
+# which is how a workflow with `packages: write` still gets
+# "denied: permission_denied: read_package". The first hand-pushed image had no
+# label, so the package was created unlinked and CI could not publish over it.
+LABEL org.opencontainers.image.source="https://github.com/HermanRas/MyStash"
+LABEL org.opencontainers.image.description="MyStash — a private, self-hosted, encrypted video wall. nginx and php-fpm in one container."
+
 WORKDIR /app
 
 COPY . /app

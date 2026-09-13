@@ -51,6 +51,18 @@ GitHub, or log in first with a personal access token that has `read:packages`:
 echo "$GITHUB_TOKEN" | docker login ghcr.io -u <your-username> --password-stdin
 ```
 
+There are two separate permissions here and they are easy to confuse:
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `docker pull` denied | the package is private | make it public, or `docker login` with `read:packages` |
+| CI's push denied with `permission_denied: read_package` | the package is not linked to the repository, so the workflow's `GITHUB_TOKEN` has no rights over it | publish an image carrying `org.opencontainers.image.source` (the Dockerfile sets it), or add the repository under *Package settings → Manage Actions access* with the Write role |
+
+The second one is worth knowing about because a workflow declaring
+`packages: write` still hits it: that permission grants rights to packages
+owned by the repository, and a package first created by a `docker push` from
+someone's laptop is not one of them until something links it.
+
 ### What you are running, and how to build it yourself instead
 
 `docker-compose.prod.yml` runs `ghcr.io/hermanras/mystash`. Every push to
