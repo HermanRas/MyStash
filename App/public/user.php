@@ -4,11 +4,19 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../src/Session.php';
 require_once __DIR__ . '/../src/User.php';
+require_once __DIR__ . '/../src/Jobs.php';
 
+use MyStash\Jobs;
 use MyStash\Session;
 use MyStash\User;
 
 Session::requireLogin();
+
+// The re-key runs in a detached worker (Docs/PLAN.md 6.6), and while it does,
+// Session::requireLogin() sends every other page here — so this screen has to
+// be able to render itself with the stash mid-flight.
+$rekeyJob = Jobs::read(Jobs::id('rekey', Session::user()));
+$rekeying = $rekeyJob !== null && $rekeyJob['state'] === Jobs::RUNNING;
 
 $index = Session::refreshIndex();
 $videoCount = count($index['videos'] ?? []);
@@ -23,6 +31,7 @@ $errors = [
     'short' => 'The new password must be at least ' . User::MIN_PASSWORD_LENGTH . ' characters.',
     'wrong' => 'That is not your current password.',
     'same' => 'The new password is the same as your current one.',
+    'running' => 'A re-encryption is already running for this stash.',
 ];
 
 $navActive = '';
@@ -62,10 +71,9 @@ $navActive = '';
 
   <div class="section-title">Change Password</div>
 
-  <?php if ($status !== ''): ?>
-    <p class="notice ok">
-      Password changed — <?= (int) $status ?> archive<?= (int) $status === 1 ? '' : 's' ?>
-      re-encrypted. This session is already using the new password.
+  <?php if (!$rekeying && $rekeyJob !== null && $rekeyJob['state'] === Jobs::FAILED): ?>
+    <p class="notice bad">
+      <?= htmlspecialchars((string) $rekeyJob['message'], ENT_QUOTES) ?>
     </p>
   <?php elseif ($error !== ''): ?>
     <p class="notice bad">
@@ -73,6 +81,26 @@ $navActive = '';
     </p>
   <?php endif; ?>
 
+  <?php if ($rekeying): ?>
+    <div class="card job-card indeterminate" id="job-card"
+         data-kind="rekey" data-target="" data-done-url="logout.php">
+      <div class="section-title" style="margin-top:0;">Re-encrypting your stash</div>
+      <div class="progress"><div class="progress-bar" id="job-bar"></div></div>
+      <p class="hint job-message" id="job-message">
+        <?= htmlspecialchars((string) $rekeyJob['message'], ENT_QUOTES) ?>
+      </p>
+      <p class="hint">
+        Every archive is being rewritten with the new key. The rest of the site is
+        closed until this finishes — a page saving something with the old password
+        half way through would leave the stash split across two keys. Closing the
+        tab is safe; the run carries on without it.
+      </p>
+      <p class="hint">
+        When it is done you will be signed out, and you sign back in with the
+        <em>new</em> password.
+      </p>
+    </div>
+  <?php else: ?>
   <div class="card">
     <form action="password_change.php" method="post" id="password-form">
       <div class="field">
@@ -97,7 +125,8 @@ $navActive = '';
       Your password <em>is</em> the encryption key, so changing it re-encrypts every
       archive in your stash<?php if ($videoCount > 0): ?>, all <?= $videoCount ?>
       video<?= $videoCount === 1 ? '' : 's' ?> included<?php endif ?>. On a large
-      stash this takes a while; leave the page open until it finishes. Each archive
+      stash this takes a while, so it runs in the background and this page shows how
+      far it has got — closing the tab will not stop it. Each archive
       keeps its previous bytes as <code>.enc.old</code> until the whole run succeeds,
       and the index is rewritten last, so an interrupted run leaves your current
       password still working.
@@ -107,39 +136,46 @@ $navActive = '';
       is unreadable.
     </p>
   </div>
+  <?php endif; ?>
 </main>
 
 <script>
   // Catch the mismatch here rather than after re-encrypting anything. The
   // server checks it too; this just saves a pointless round trip.
   const form = document.getElementById('password-form');
-  const next = document.getElementById('new-password');
-  const again = document.getElementById('confirm-password');
-  const hint = document.getElementById('match-hint');
 
-  const compare = () => {
-    const mismatched = again.value !== '' && next.value !== again.value;
-    hint.hidden = !mismatched;
-    again.setCustomValidity(mismatched ? 'The two new passwords do not match.' : '');
-  };
+  // While a re-key is running the form is not on the page at all — the progress
+  // card is in its place — so there is nothing here to wire up.
+  if (form) {
+    const next = document.getElementById('new-password');
+    const again = document.getElementById('confirm-password');
+    const hint = document.getElementById('match-hint');
 
-  next.addEventListener('input', compare);
-  again.addEventListener('input', compare);
+    const compare = () => {
+      const mismatched = again.value !== '' && next.value !== again.value;
+      hint.hidden = !mismatched;
+      again.setCustomValidity(mismatched ? 'The two new passwords do not match.' : '');
+    };
 
-  form.addEventListener('submit', (event) => {
-    compare();
-    if (!form.checkValidity()) {
-      event.preventDefault();
-      form.reportValidity();
-      return;
-    }
-    // The re-key is synchronous and can run for a while; say so, and make it
-    // impossible to fire a second one over the top of the first.
-    const button = form.querySelector('button[type="submit"]');
-    button.disabled = true;
-    button.textContent = 'Re-encrypting your stash…';
-  });
+    next.addEventListener('input', compare);
+    again.addEventListener('input', compare);
+
+    form.addEventListener('submit', (event) => {
+      compare();
+      if (!form.checkValidity()) {
+        event.preventDefault();
+        form.reportValidity();
+        return;
+      }
+      // Starting the job is instant, but the redirect still has to land; make it
+      // impossible to fire a second press at it in the meantime.
+      const button = form.querySelector('button[type="submit"]');
+      button.disabled = true;
+      button.textContent = 'Starting…';
+    });
+  }
 </script>
 
+<script src="assets/job.js"></script>
 </body>
 </html>

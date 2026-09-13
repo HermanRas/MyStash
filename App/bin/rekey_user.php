@@ -28,7 +28,7 @@ $result = (new Rekey())->run(
     $user,
     $oldPassword,
     $newPassword,
-    static fn(string $name) => print("re-encrypted {$name}\n"),
+    static fn(int $done, int $total, string $name) => print("re-encrypted {$done}/{$total}  {$name}\n"),
 );
 
 if (!$result['ok']) {

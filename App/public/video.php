@@ -6,8 +6,10 @@ require_once __DIR__ . '/../src/Session.php';
 require_once __DIR__ . '/../src/VideoCategories.php';
 require_once __DIR__ . '/../src/CreatorStore.php';
 require_once __DIR__ . '/../src/VideoCreators.php';
+require_once __DIR__ . '/../src/Jobs.php';
 
 use MyStash\CreatorStore;
+use MyStash\Jobs;
 use MyStash\Session;
 use MyStash\VideoCategories;
 use MyStash\VideoCreators;
@@ -33,6 +35,11 @@ if ($video === null) {
     header('Location: wall.php');
     exit;
 }
+
+// A conversion runs in a detached worker (Docs/PLAN.md 4.28), so this page has
+// to ask how the last one for this video is getting on rather than assume.
+$convertJob = Jobs::read(Jobs::id('convert', Session::user(), $id));
+$converting = $convertJob !== null && $convertJob['state'] === Jobs::RUNNING;
 
 $editing = isset($_GET['edit']);
 $assignments = (new VideoCategories())->load(Session::user(), Session::password(), $id);
@@ -78,8 +85,10 @@ $navActive = 'videos';
       <button type="button" id="player-play" style="position:relative; z-index:1; background:rgba(0,0,0,0.6); border:1px solid var(--border); color:#fff; border-radius:50%; width:64px; height:64px; font-size:20px; cursor:pointer;">▶</button>
     </div>
 
-    <?php if (isset($_GET['convert_error'])): ?>
-      <p class="hint" style="color:#ff6b6b;">Conversion failed — no encrypted video file exists for this entry yet (seed/demo data has no real media behind it).</p>
+    <?php if (!$converting && $convertJob !== null && $convertJob['state'] === Jobs::FAILED): ?>
+      <p class="hint" style="color:#ff6b6b;">
+        <?= htmlspecialchars((string) $convertJob['message'], ENT_QUOTES) ?>
+      </p>
     <?php endif; ?>
 
     <div class="watch-meta">
@@ -126,13 +135,32 @@ $navActive = 'videos';
       <div class="form-actions">
         <a class="btn secondary" href="video.php?id=<?= urlencode($id) ?>&edit=1">Edit Video</a>
 
-        <?php if (!empty($video['not_converted'])): ?>
+        <?php /* While a conversion is running the button is gone, not merely
+                 disabled — a second run over the same archive is refused by the
+                 job id anyway, but offering it would be a lie. */ ?>
+        <?php if (!empty($video['not_converted']) && !$converting): ?>
           <form action="video_convert.php" method="post">
             <input type="hidden" name="id" value="<?= htmlspecialchars($id, ENT_QUOTES) ?>">
             <button type="submit" class="btn">Convert to MP4/H.265</button>
           </form>
         <?php endif; ?>
       </div>
+
+      <?php if ($converting): ?>
+        <div class="card job-card indeterminate" id="job-card"
+             data-kind="convert" data-target="<?= htmlspecialchars($id, ENT_QUOTES) ?>">
+          <div class="section-title" style="margin-top:0;">Converting to MP4/H.265</div>
+          <div class="progress"><div class="progress-bar" id="job-bar"></div></div>
+          <p class="hint job-message" id="job-message">
+            <?= htmlspecialchars((string) $convertJob['message'], ENT_QUOTES) ?>
+          </p>
+          <p class="hint">
+            This runs in the background. You can leave this page, keep browsing,
+            or close the tab — it carries on, and the video stays exactly as it
+            is until the converted copy has been written and verified.
+          </p>
+        </div>
+      <?php endif; ?>
 
       <div class="section-title">Description</div>
       <p class="tile-stats" style="font-size:13px; color:#ccc;">
@@ -280,6 +308,7 @@ $navActive = 'videos';
     });
   });
 </script>
+<script src="assets/job.js"></script>
 
 </body>
 </html>

@@ -6,6 +6,7 @@ namespace MyStash;
 
 require_once __DIR__ . '/Crypto7z.php';
 require_once __DIR__ . '/Datastore.php';
+require_once __DIR__ . '/Jobs.php';
 
 /**
  * Starts a PHP session backed by tmpfs (/dev/shm) instead of the default
@@ -55,12 +56,47 @@ final class Session
         session_destroy();
     }
 
+    /**
+     * Pages that are still reachable while the stash is being re-keyed.
+     *
+     * Everything else is not, and that is not a UI nicety — see below.
+     */
+    private const REKEY_SAFE_PAGES = ['user.php', 'job_status.php', 'logout.php', 'login.php'];
+
     public static function requireLogin(): void
     {
         self::start();
 
         if (!self::isLoggedIn()) {
             header('Location: login.html');
+            exit;
+        }
+
+        self::blockDuringRekey();
+    }
+
+    /**
+     * While a re-key job is running, the stash is locked read-only — in
+     * practice, locked to the Profile screen showing its progress.
+     *
+     * Making the re-key a background job (Docs/PLAN.md 6.6) reopened the
+     * failure 6.5 was written about. The session holds the *old* password; the
+     * worker is moving every archive onto the new one, index last. A page load
+     * in the middle still decrypts fine (the index is still on the old key) and
+     * would happily write something back under the old password — landing that
+     * archive on a key the rest of the stash has already left. That is exactly
+     * the split-key state that once had to be repaired by hand.
+     *
+     * When it was synchronous the request itself was the lock. Now this is.
+     */
+    private static function blockDuringRekey(): void
+    {
+        if (in_array(basename((string) ($_SERVER['SCRIPT_NAME'] ?? '')), self::REKEY_SAFE_PAGES, true)) {
+            return;
+        }
+
+        if (Jobs::isAlive(Jobs::id('rekey', self::user()))) {
+            header('Location: user.php?rekeying=1');
             exit;
         }
     }

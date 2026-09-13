@@ -989,3 +989,42 @@ select option {
   margin: 0 0 16px;
   padding: 0 24px;
 }
+
+/* ---------- Background job progress (PLAN 4.28, 6.6) ---------- */
+
+.progress {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(135deg, var(--accent), #d97400);
+  transition: width 0.4s ease;
+}
+
+/* Before ffmpeg reports its first position there is no honest percentage to
+   show, so the bar sweeps instead of sitting at zero looking stuck. */
+.job-card.indeterminate .progress-bar {
+  width: 35% !important;
+  transition: none;
+  animation: job-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes job-sweep {
+  0%   { margin-left: -35%; }
+  100% { margin-left: 100%; }
+}
+
+.job-card .job-message {
+  margin: 10px 0 0;
+}
+
+.job-card[data-state="failed"] .progress-bar {
+  background: #cc4444;
+  animation: none;
+}

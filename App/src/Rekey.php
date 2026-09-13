@@ -44,8 +44,10 @@ final class Rekey
      * Never throws and never exits — callers get a result they can render,
      * whether that is a CLI script or a web request.
      *
-     * @param callable(string):void|null $onProgress called with each archive's
-     *        basename as it is rewritten
+     * @param callable(int, int, string):void|null $onProgress called after each
+     *        archive is rewritten with (done, total, basename). The total is
+     *        known up front, which is what lets a caller render "14 of 37"
+     *        rather than a spinner (Docs/PLAN.md 6.6).
      * @return array{ok: bool, message: string, rewritten: int}
      */
     public function run(
@@ -101,7 +103,7 @@ final class Rekey
                 $rewritten[] = $archive;
 
                 if ($onProgress !== null) {
-                    $onProgress(basename($archive));
+                    $onProgress(count($rewritten), count($archives), basename($archive));
                 }
             } finally {
                 // The plaintext only ever existed in tmpfs, and not past here.

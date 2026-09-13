@@ -1,4 +1,5 @@
-// 6.1 — the Profile screen's password change, end to end through the real form.
+// 6.1/6.6 — the Profile screen's password change, end to end through the real
+// form, now that the re-encryption runs as a detached background job.
 //
 // Runs entirely against a throwaway stash created for this test and deleted
 // afterwards. It never touches the real user: changing a password re-encrypts
@@ -76,26 +77,52 @@ if (!USER || !OLD || !NEW) {
     !(await page.locator('#match-hint').isHidden()));
 
   // --- The real change, through the form. ---
+  //
+  // 6.6: this no longer re-encrypts inside the request. The POST starts a
+  // detached job and comes straight back to the Profile screen, which polls and
+  // shows progress; when the job finishes the page signs the user out.
   await page.fill('#current-password', OLD);
   await page.fill('#new-password', NEW);
   await page.fill('#confirm-password', NEW);
+
+  const startedAt = Date.now();
   await Promise.all([
-    page.waitForNavigation({ waitUntil: 'networkidle', timeout: 120000 }),
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
     page.click('#password-form button[type="submit"]'),
   ]);
+  const postMs = Date.now() - startedAt;
 
-  check(`the change reports success (${page.url().split('?')[1] || ''})`,
-    page.url().includes('changed='));
-  const notice = await page.locator('.notice.ok').innerText().catch(() => '');
-  console.log(`  notice: ${notice.replace(/\s+/g, ' ').trim()}`);
-  check('a success notice is shown', notice.toLowerCase().includes('password changed'));
-  await page.screenshot({ path: '/work/screenshots/profile_changed.png' });
+  console.log(`  the submit returned in ${postMs}ms`);
+  check('the submit returns at once instead of blocking on the re-encryption', postMs < 5000);
+  check(`it lands back on the Profile screen (${page.url().split('?')[1] || ''})`,
+    page.url().includes('user.php') && page.url().includes('rekeying=1'));
+  check('a progress card is shown in place of the form',
+    await page.locator('#job-card').count() === 1
+      && await page.locator('#password-form').count() === 0);
+  await page.screenshot({ path: '/work/screenshots/profile_rekeying.png' });
 
-  // The session must survive: the old key no longer opens anything, so without
-  // the session adopting the new one this would bounce to the login screen.
-  await page.goto(`${BASE}/wall.php`, { waitUntil: 'networkidle' });
-  check('the session stays logged in on the new password',
-    page.url().includes('wall.php') && await page.locator('.video-grid').count() === 1);
+  // While the job runs, the rest of the site must be out of reach — a page
+  // saving anything under the old password mid-run would split the stash
+  // across two keys. A probe stash is tiny, so the run may already be over by
+  // the time this asks; only assert it if it is genuinely still going.
+  const stillRunning = async () => {
+    const status = await page.request.get(
+      `${BASE}/job_status.php?kind=rekey&target=`, { maxRedirects: 0 });
+    return status.ok() && (await status.json()).state === 'running';
+  };
+
+  if (await stillRunning()) {
+    const blocked = await page.request.get(`${BASE}/wall.php`, { maxRedirects: 0 });
+    check('the rest of the site is locked while the re-key runs',
+      (blocked.headers()['location'] || '').includes('user.php'));
+  } else {
+    console.log('SKIP: the lock check (the probe stash finished re-keying too quickly)');
+  }
+
+  // The card's poller sends the browser to logout.php when the job succeeds.
+  await page.waitForURL(/login|logout/, { timeout: 120000 });
+  check(`the finished job signs the user out (${page.url().split('/').pop()})`,
+    !page.url().includes('user.php'));
 
   // --- And it really is the new password now. ---
   await page.goto(`${BASE}/logout.php`, { waitUntil: 'networkidle' });

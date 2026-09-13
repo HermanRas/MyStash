@@ -9,11 +9,13 @@ require __DIR__ . '/../src/User.php';
 require __DIR__ . '/../src/VideoQuery.php';
 require __DIR__ . '/../src/CreatorQuery.php';
 require __DIR__ . '/../src/Rekey.php';
+require __DIR__ . '/../src/Jobs.php';
 
 use MyStash\CreatorQuery;
 use MyStash\Datastore;
 use MyStash\Rekey;
 use MyStash\Crypto7z;
+use MyStash\Jobs;
 use MyStash\User;
 use MyStash\VideoEncoder;
 use MyStash\VideoCreators;
@@ -475,5 +477,105 @@ step(
 
 Datastore::wipe(Datastore::userDir($probe));
 step('the throwaway stash is gone', !is_dir(Datastore::userDir($probe)));
+
+
+// ---------------------------------------------------------------------------
+// Background jobs (Docs/PLAN.md 4.28, 6.6)
+//
+// The worker is spawned for real here — a deliberately unknown job kind, so it
+// exercises the whole detach-and-report path (spawn, lock, claim the secrets,
+// write an outcome) without needing ffmpeg or a stash to work on.
+// ---------------------------------------------------------------------------
+
+echo PHP_EOL . "-- background jobs --" . PHP_EOL;
+
+step(
+    'a job id is derived from the user and the target, not random',
+    Jobs::id('convert', 'Ann', '7') === Jobs::id('convert', 'Ann', '7'),
+);
+step(
+    '...so two users never collide, and neither do two videos',
+    Jobs::id('convert', 'Ann', '7') !== Jobs::id('convert', 'Bob', '7')
+        && Jobs::id('convert', 'Ann', '7') !== Jobs::id('convert', 'Ann', '8'),
+);
+
+$jobUser = 'JobProbe' . bin2hex(random_bytes(3));
+$jobId = Jobs::id('probe', $jobUser, '');
+
+step('nothing is alive before a job is started', !Jobs::isAlive($jobId));
+step('...and there is no record to read', Jobs::read($jobId) === null);
+
+$started = Jobs::start('probe', $jobUser, '', ['password' => 'the-secret-key-nobody-may-see'], []);
+step('starting a job reports success', $started['ok'] && $started['id'] === $jobId);
+
+// The request that started it must not have waited for it. A worker that took
+// the request's thread with it is the whole bug 4.28 is about.
+$record = Jobs::read($jobId);
+step('the record exists immediately, without waiting for the work', $record !== null);
+
+// The redirect straight after pressing Convert lands here, before the worker
+// has had time to take its lock. Reporting "the job died" at that moment would
+// be wrong every single time.
+step(
+    'a job that has only just been spawned is not reported as dead',
+    ($record['state'] ?? '') === Jobs::RUNNING,
+);
+
+// The password went to the worker, never into the record the browser polls.
+step(
+    'the job record carries no password',
+    !str_contains((string) json_encode($record), 'the-secret-key-nobody-may-see'),
+);
+
+// Give the worker its moment to run and report.
+for ($waited = 0; $waited < 100; $waited++) {
+    $record = Jobs::read($jobId);
+    if (($record['state'] ?? '') !== Jobs::RUNNING) {
+        break;
+    }
+    usleep(100_000);
+}
+
+step('the worker ran and reported an outcome (' . ($record['state'] ?? '?') . ')',
+    ($record['state'] ?? '') === Jobs::FAILED);
+step('...and said why', str_contains((string) ($record['message'] ?? ''), 'Unknown job type'));
+
+step(
+    'the key file is destroyed once the worker has read it',
+    !file_exists(Jobs::ROOT . '/' . $jobId . '.key'),
+);
+step('the lock is released when the worker exits', !Jobs::isAlive($jobId));
+
+// A worker killed outright leaves a record that still says "running" forever.
+// The lock is the only thing that actually knows, and read() must trust it
+// rather than the record — otherwise the page shows a bar that never moves.
+// Backdated past the spawn grace window: this is a job that started a minute
+// ago and whose worker is gone, not one that is still getting off the ground.
+Jobs::update($jobId, [
+    'state' => Jobs::RUNNING,
+    'message' => 'pretending',
+    'started_at' => time() - 60,
+]);
+$abandoned = Jobs::read($jobId);
+step(
+    'a record claiming to run with no worker behind it is reported as failed',
+    ($abandoned['state'] ?? '') === Jobs::FAILED && $abandoned['alive'] === false,
+);
+
+Jobs::forget($jobId);
+step('forgetting a job removes its record', Jobs::read($jobId) === null);
+
+step(
+    'a job id that did not come from id() is refused rather than used as a path',
+    (static function (): bool {
+        try {
+            Jobs::read('../../etc/passwd');
+        } catch (\InvalidArgumentException) {
+            return true;
+        }
+
+        return false;
+    })(),
+);
 
 echo PHP_EOL . "All smoke tests passed." . PHP_EOL;

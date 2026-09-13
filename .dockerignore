@@ -1,0 +1,6 @@
+# The stash is bind-mounted at run time. Copying it into the image would bake a
+# snapshot of every encrypted archive into every build layer.
+App/Data
+dev/playwright/screenshots
+dev/playwright/.pwlib
+.git

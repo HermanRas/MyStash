@@ -87,19 +87,132 @@ final class VideoEncoder
 
     /**
      * Converts $inputPath to MP4/H.265 at $outputPath.
+     *
+     * With no $onProgress this is the plain blocking call it always was. Give
+     * it one and it supervises ffmpeg instead: it asks for machine-readable
+     * progress (`-progress pipe:1`, which emits `out_time_us=` as it goes —
+     * far more reliable than scraping the human stderr banner), reports the
+     * position against the duration, and kills a run that has stopped moving.
+     *
+     * The stall timer is deliberately *not* a total time limit. A 90-minute
+     * video legitimately takes a long time to encode, and a ceiling short
+     * enough to catch a wedged ffmpeg would murder a healthy one. What is
+     * never normal is ffmpeg sitting at the same timestamp for minutes, so
+     * that is what gets killed. $ceilingSeconds is only a last backstop.
+     *
+     * @param callable(float, float):void|null $onProgress (secondsDone, secondsTotal)
      */
-    public function convertToMp4Hevc(string $inputPath, string $outputPath): bool
-    {
+    public function convertToMp4Hevc(
+        string $inputPath,
+        string $outputPath,
+        ?callable $onProgress = null,
+        int $stallSeconds = 180,
+        int $ceilingSeconds = 21600,
+    ): bool {
         $command = [
             $this->ffmpeg,
             '-y',
+            // Detached from any terminal: without this ffmpeg can block trying
+            // to read the console for its interactive keys.
+            '-nostdin',
             '-i', $inputPath,
             '-c:v', 'libx265',
             '-c:a', 'aac',
             $outputPath,
         ];
 
-        return $this->run($command)[0] === 0;
+        if ($onProgress === null) {
+            return $this->run($command)[0] === 0;
+        }
+
+        // Known up front, so progress can be a percentage rather than a
+        // spinner. 0.0 if ffprobe cannot say, and the caller renders
+        // indeterminate rather than dividing by it.
+        $total = $this->durationSeconds($inputPath) ?? 0.0;
+
+        array_splice($command, -1, 0, ['-progress', 'pipe:1', '-nostats', '-loglevel', 'error']);
+
+        $process = proc_open(
+            $command,
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+        );
+
+        if (!is_resource($process)) {
+            return false;
+        }
+
+        fclose($pipes[0]);
+        stream_set_blocking($pipes[1], false);
+        stream_set_blocking($pipes[2], false);
+
+        $buffer = '';
+        $startedAt = time();
+        $movedAt = time();
+        $position = 0.0;
+        $exitCode = 1;
+
+        while (true) {
+            $status = proc_get_status($process);
+
+            $chunk = fread($pipes[1], 8192);
+            if (is_string($chunk) && $chunk !== '') {
+                $buffer .= $chunk;
+            }
+
+            // Drained and discarded: a full stderr pipe would block ffmpeg
+            // itself, which would then look exactly like a stall.
+            fread($pipes[2], 8192);
+
+            while (($break = strpos($buffer, "\n")) !== false) {
+                $line = trim(substr($buffer, 0, $break));
+                $buffer = substr($buffer, $break + 1);
+
+                if (!str_starts_with($line, 'out_time_us=')) {
+                    continue;
+                }
+
+                $microseconds = substr($line, strlen('out_time_us='));
+
+                // ffmpeg reports N/A before the first frame is written.
+                if (!ctype_digit($microseconds)) {
+                    continue;
+                }
+
+                $seconds = ((int) $microseconds) / 1_000_000;
+
+                if ($seconds > $position) {
+                    $position = $seconds;
+                    $movedAt = time();
+                    $onProgress($position, $total);
+                }
+            }
+
+            if (!$status['running']) {
+                $exitCode = $status['exitcode'];
+                break;
+            }
+
+            if (time() - $movedAt > $stallSeconds || time() - $startedAt > $ceilingSeconds) {
+                proc_terminate($process, 9);
+                proc_close($process);
+
+                // Half a file is not a conversion. The caller keeps the
+                // original because it never overwrites it (Crypto7z::replace),
+                // but leaving this behind would litter tmpfs.
+                @unlink($outputPath);
+
+                return false;
+            }
+
+            usleep(200_000);
+        }
+
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        proc_close($process);
+
+        return $exitCode === 0;
     }
 
     /**

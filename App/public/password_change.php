@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../src/Session.php';
-require_once __DIR__ . '/../src/Rekey.php';
+require_once __DIR__ . '/../src/Jobs.php';
 require_once __DIR__ . '/../src/User.php';
 
-use MyStash\Rekey;
+use MyStash\Jobs;
 use MyStash\Session;
 use MyStash\User;
 
@@ -14,9 +14,8 @@ use MyStash\User;
  * Changes the stash password (Docs/PLAN.md 6.1).
  *
  * The password *is* the encryption key, so this is not a field update — it
- * re-encrypts every archive the user owns (App/src/Rekey.php). The session then
- * adopts the new password so the user stays logged in; without that, the very
- * next page load would find an index its key no longer opens and log them out.
+ * re-encrypts every archive the user owns (App/src/Rekey.php). That runs as a
+ * background job (6.6), so this endpoint only validates and starts it.
  */
 
 Session::requireLogin();
@@ -56,25 +55,31 @@ if (!hash_equals(Session::password(), $current)) {
     $back('error=wrong');
 }
 
-// Re-encrypting every video is CPU-bound 7zip work and can outrun the default
-// time limit on a large stash. The request must not be cut off half way.
+// Re-encrypting every archive is CPU-bound 7zip work over the whole stash, so
+// it runs as a detached background job rather than inside this request
+// (Docs/PLAN.md 6.6). The browser used to sit on a pending request for minutes
+// with no way to tell whether it had finished; now the Profile page polls
+// job_status.php and shows "re-encrypted 14 of 37".
 //
-// This is deliberately synchronous, which is correct but impatient: on a big
-// stash the browser sits on a pending request for minutes, and a reverse proxy
-// would time it out whatever PHP's own limit says. Moving it to a background
-// worker with a progress poll is Docs/PLAN.md 6.6.
-set_time_limit(0);
-ignore_user_abort(true);
+// The passwords go to the worker through the job's tmpfs key file, which it
+// deletes as it reads — never on its argv, where `ps` would show them.
+$started = Jobs::start(
+    'rekey',
+    Session::user(),
+    '',
+    ['old_password' => $current, 'new_password' => $new],
+    ['message' => 'Starting…'],
+);
 
-$result = (new Rekey())->run(Session::user(), $current, $new);
-
-if (!$result['ok']) {
-    error_log('MyStash password change failed for ' . Session::user() . ': ' . $result['message']);
-    $back('error=failed');
+if (!$started['ok']) {
+    $back('error=running');
 }
 
-// Only now, with every archive on the new key.
-Session::setPassword($new);
-Session::refreshIndex();
-
-$back('changed=' . $result['rewritten']);
+// No Session::setPassword() here, and deliberately no attempt to hand the new
+// password over when the job finishes. The session holding a password the
+// archives are not yet on is the dangerous state (6.5), and the job outlives
+// this request anyway. The honest ending is to sign the user out when it
+// completes and have them log back in with the new password, which proves it
+// worked. Session::requireLogin() keeps every other page out of reach until
+// then, so nothing can write under the old key mid-run.
+$back('rekeying=1');

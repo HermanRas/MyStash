@@ -1,7 +1,22 @@
 services:
+  # The service is still called "app" on port 8080 so every bookmark, every
+  # dev/playwright check (BASE_URL=http://app:8080) and dev/*.sh keep working —
+  # what changed is that "app" is now nginx, with PHP behind it.
   app:
-    build: ./App
+    image: nginx:1.27-alpine
     ports:
       - "8080:8080"
     volumes:
+      - ./App:/app:ro
+      - ./App/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - php
+
+  php:
+    build: ./App
+    volumes:
       - ./App:/app
+    # Every decrypt stages plaintext in /dev/shm — the extract dirs, the convert
+    # work dirs, the sessions and the job records. Docker's default is 64M,
+    # which is smaller than a single video: extraction would simply fail.
+    shm_size: 2gb

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# 4.29 — conversion must never lose the video it is converting.
+# 4.28/4.29 — conversion runs in the background, and must never lose the video
+# it is converting.
 #
 # Drives the real video_convert.php endpoint over HTTP, against a throwaway
 # stash this script creates and deletes. It never touches a real user: a
@@ -24,7 +25,7 @@ cleanup() {
 trap cleanup EXIT
 
 # --- a stash with one real, unconverted video -----------------------------
-docker compose exec -T -e U="$PROBE" -e P="$PASS" app php -r '
+docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" php php -r '
 require_once "/app/src/User.php";
 require_once "/app/src/VideoEncoder.php";
 require_once "/app/src/VideoCategories.php";
@@ -44,7 +45,7 @@ echo "ingested video {$entry["id"]}, not_converted=", var_export($entry["not_con
 ' || { echo "FAIL: could not build the throwaway stash"; fails=1; exit 1; }
 
 # The bytes we must still have afterwards, whatever happens.
-BEFORE=$(docker compose exec -T -e U="$PROBE" -e P="$PASS" app php -r '
+BEFORE=$(docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" php php -r '
 require_once "/app/src/Crypto7z.php";
 $c = new MyStash\Crypto7z();
 $c->extract("/app/Data/" . getenv("U") . "/videos/Video1/1.mp4.enc", "/dev/shm/before", getenv("P"));
@@ -55,12 +56,48 @@ echo "  original video sha256: ${BEFORE:0:16}…"
 
 # --- convert it through the endpoint a user would press -------------------
 curl -s -c "$JAR" -o /dev/null -d "username=${PROBE}&password=${PASS}" http://localhost:8080/login.php
-LOCATION=$(curl -s -b "$JAR" -o /dev/null -w '%{redirect_url}' -d "id=1" http://localhost:8080/video_convert.php)
-echo "  convert redirected to: ${LOCATION##*/}"
-case "$LOCATION" in *convert_error*) check "the conversion succeeds" 1;; *) check "the conversion succeeds" 0;; esac
+
+# 4.28: the POST starts a job and returns. If it ever goes back to doing the
+# transcode inline, this is the assertion that notices — the whole failure was
+# a request that never came back.
+POST_MS=$(curl -s -b "$JAR" -o /dev/null -w '%{time_total}' -d "id=1" http://localhost:8080/video_convert.php \
+  | awk '{printf "%d", $1 * 1000}')
+echo "  convert POST returned in ${POST_MS}ms"
+[ "$POST_MS" -lt 3000 ]; check "the convert POST returns immediately instead of blocking on ffmpeg" $?
+
+# ...and the rest of the site answers while it runs. This is the symptom that
+# started 4.28: one transcode and the whole app stopped responding.
+WALL_MS=$(curl -s -b "$JAR" -o /dev/null -w '%{time_total}' http://localhost:8080/wall.php \
+  | awk '{printf "%d", $1 * 1000}')
+echo "  wall.php answered in ${WALL_MS}ms while the conversion was running"
+[ "$WALL_MS" -lt 5000 ]; check "the site still answers while a conversion is running" $?
+
+# A second press *while the first is still running* must not start a second
+# ffmpeg over the same archive. The job id is derived from the user and the
+# video, so the second press finds the first job instead of launching another.
+# (The pattern is bracketed so pgrep does not count the shell running it.)
+curl -s -b "$JAR" -o /dev/null -d "id=1" http://localhost:8080/video_convert.php
+WORKERS=$(docker compose exec -T -u www-data php sh -c 'pgrep -fc "[j]ob_worker" || true' | tr -d "\r")
+echo "  job_worker processes after a second press: ${WORKERS:-0}"
+[ "${WORKERS:-0}" -le 1 ]; check "a second Convert press does not start a second worker" $?
+
+# --- watch the job the way the browser does -------------------------------
+STATE=""; SEEN_RUNNING=0; PEAK=0
+for _ in $(seq 1 180); do
+  JSON=$(curl -s -b "$JAR" "http://localhost:8080/job_status.php?kind=convert&target=1")
+  STATE=$(printf '%s' "$JSON" | sed -n 's/.*"state":"\([a-z]*\)".*/\1/p')
+  PERCENT=$(printf '%s' "$JSON" | sed -n 's/.*"percent":\([0-9]*\).*/\1/p')
+  [ "$STATE" = "running" ] && SEEN_RUNNING=1
+  [ -n "${PERCENT:-}" ] && [ "$PERCENT" -gt "$PEAK" ] && PEAK=$PERCENT
+  case "$STATE" in done|failed) break;; esac
+  sleep 1
+done
+echo "  job ended in state '${STATE}', highest reported progress ${PEAK}%"
+[ "$SEEN_RUNNING" = "1" ]; check "the job reports itself as running while it works" $?
+[ "$STATE" = "done" ]; check "the job finishes successfully" $?
 
 # --- the video must still be there, and now be MP4/H.265 ------------------
-docker compose exec -T -e U="$PROBE" -e P="$PASS" -e B="$BEFORE" app php -r '
+docker compose exec -T -u www-data -e U="$PROBE" -e P="$PASS" -e B="$BEFORE" php php -r '
 require_once "/app/src/Crypto7z.php";
 require_once "/app/src/VideoEncoder.php";
 require_once "/app/src/Datastore.php";
