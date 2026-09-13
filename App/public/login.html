@@ -15,6 +15,7 @@
     </div>
 
     <p class="hint" id="login-error" hidden style="color:#ff6b6b;">Incorrect username or password.</p>
+    <p class="hint" id="login-throttled" hidden style="color:#ff6b6b;"></p>
     <p class="hint" id="login-stale" hidden style="color:#ffa31a;">Your session ended: this stash's password was changed elsewhere. Sign in with the new password.</p>
     <p class="hint" id="login-deleted" hidden style="color:#ffa31a;">Your stash has been deleted. Nothing of it remains — the name is free to use again.</p>
 
@@ -42,8 +43,18 @@
   }
 
   const error = params.get('error');
+  const wait = params.get('wait');
   if (error === 'stale') {
     document.getElementById('login-stale').hidden = false;
+  } else if (wait !== null) {
+    // Too many failed attempts (7.3). Says how long, because a lockout with no
+    // stated end looks like a broken stash — and there is no reset to fall
+    // back on: the password is the only key there is.
+    const minutes = Math.max(1, parseInt(wait, 10) || 1);
+    const el = document.getElementById('login-throttled');
+    el.textContent = 'Too many failed attempts. Try again in '
+      + minutes + (minutes === 1 ? ' minute.' : ' minutes.');
+    el.hidden = false;
   } else if (error !== null) {
     document.getElementById('login-error').hidden = false;
   }

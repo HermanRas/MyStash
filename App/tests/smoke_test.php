@@ -10,6 +10,7 @@ require __DIR__ . '/../src/VideoQuery.php';
 require __DIR__ . '/../src/CreatorQuery.php';
 require __DIR__ . '/../src/Rekey.php';
 require __DIR__ . '/../src/Jobs.php';
+require_once __DIR__ . '/../src/LoginThrottle.php';
 require_once __DIR__ . '/../src/VideoIngest.php';
 require_once __DIR__ . '/../src/VideoPreview.php';
 
@@ -24,6 +25,7 @@ use MyStash\VideoIngest;
 use MyStash\VideoPreview;
 use MyStash\VideoCreators;
 use MyStash\VideoQuality;
+use MyStash\LoginThrottle;
 use MyStash\VideoQuery;
 
 function step(string $label, bool $ok): void
@@ -906,5 +908,77 @@ step('...and the failed upload left no orphan directory behind', $orphans() === 
 
 Datastore::wipe(Datastore::userDir($injUser));
 step('cleaned up', !is_dir(Datastore::userDir($injUser)));
+
+// -------------------------------------------------------------------------
+echo PHP_EOL . "-- login throttling (7.3) --" . PHP_EOL;
+// -------------------------------------------------------------------------
+
+// Cleared before and after: these counters are shared with the running app,
+// and a test that left one behind would lock a real name out for real.
+$clearThrottle = static function (): void {
+    foreach (glob('/dev/shm/mystash-login/*.json') ?: [] as $f) {
+        @unlink($f);
+    }
+};
+$clearThrottle();
+
+$tUser = 'ThrUnit' . bin2hex(random_bytes(3));
+$tAddr = '203.0.113.' . random_int(1, 254);
+
+step('a name with no history is not throttled',
+    LoginThrottle::retryAfter($tUser, $tAddr) === 0);
+
+for ($i = 0; $i < LoginThrottle::MAX_PER_USER - 1; $i++) {
+    LoginThrottle::recordFailure($tUser, $tAddr);
+}
+
+step('it is still allowed one attempt below the limit',
+    LoginThrottle::retryAfter($tUser, $tAddr) === 0);
+
+LoginThrottle::recordFailure($tUser, $tAddr);
+$wait = LoginThrottle::retryAfter($tUser, $tAddr);
+
+step("the limit locks the name out ({$wait}s)", $wait > 0);
+step('...and the wait never exceeds the window, so it always expires',
+    $wait <= LoginThrottle::WINDOW_SECONDS);
+
+// A different name must be unaffected: the counter is per name, not global.
+step('another name at the same address is unaffected',
+    LoginThrottle::retryAfter('ThrOther' . bin2hex(random_bytes(3)), $tAddr) === 0);
+
+LoginThrottle::clear($tUser);
+step('a successful login clears that name', LoginThrottle::retryAfter($tUser, $tAddr) === 0);
+
+// clear() must not wipe the address counter too: on a shared address that
+// would hand an attacker a reset button for every name behind it.
+$tAddr2 = '203.0.113.' . random_int(1, 254);
+$victims = [];
+for ($i = 0; $i < LoginThrottle::MAX_PER_ADDRESS; $i++) {
+    $victims[$i] = 'ThrSpray' . bin2hex(random_bytes(4));
+    LoginThrottle::recordFailure($victims[$i], $tAddr2);
+}
+step('spraying many names from one address trips the address limit',
+    LoginThrottle::addressRetryAfter($tAddr2) > 0);
+
+LoginThrottle::clear($victims[0]);
+step('...and clearing one of those names does not reset the address',
+    LoginThrottle::addressRetryAfter($tAddr2) > 0);
+
+// The floor is what closes the timing oracle, so it has to actually wait.
+$began = microtime(true);
+LoginThrottle::settle($began);
+$slept = microtime(true) - $began;
+step(sprintf('settle() holds a fast failure to the floor (%.0fms)', $slept * 1000),
+    $slept >= LoginThrottle::FLOOR_SECONDS * 0.9);
+
+// ...and must never add to a slow one, or it becomes a way to hold workers.
+$began = microtime(true) - 5.0;
+$before = microtime(true);
+LoginThrottle::settle($began);
+step('...and adds nothing to work that was already slower',
+    microtime(true) - $before < 0.05);
+
+$clearThrottle();
+step('cleaned up', glob('/dev/shm/mystash-login/*.json') === []);
 
 echo PHP_EOL . "All smoke tests passed." . PHP_EOL;

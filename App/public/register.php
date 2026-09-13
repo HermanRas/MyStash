@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../src/LoginThrottle.php';
 require_once __DIR__ . '/../src/Session.php';
 require_once __DIR__ . '/../src/User.php';
 
 use MyStash\Datastore;
+use MyStash\LoginThrottle;
 use MyStash\Session;
 use MyStash\User;
 
@@ -20,8 +22,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $confirm = (string) ($_POST['confirm_password'] ?? '');
 
     $users = new User();
+    $address = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
 
-    if (!User::isValidName($username)) {
+    // Registration shares the address counter with failed logins, so a source
+    // grinding away at either is eventually refused at both (7.3).
+    //
+    // Only *failed* attempts are counted, deliberately. Behind a reverse proxy
+    // every request can arrive from the same apparent address — in this Docker
+    // setup they all come from the gateway — so this counter is close to
+    // global, and counting successful registrations against it would let
+    // ordinary use lock the door for everyone. A flood of *successful*
+    // registrations is therefore not throttled here; the control for that is
+    // not exposing registration to the internet in the first place.
+    $registerWait = LoginThrottle::addressRetryAfter($address);
+
+    if ($registerWait > 0) {
+        $error = sprintf(
+            'Too many attempts from this address. Try again in %d minutes.',
+            (int) ceil($registerWait / 60),
+        );
+    } elseif (!User::isValidName($username)) {
         $error = 'Username must be letters and numbers only — no spaces or symbols.';
     } elseif ($users->exists($username)) {
         $error = 'That username is already taken.';
@@ -44,6 +64,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $error = 'Stash created, but sign-in failed. Please log in.';
+    }
+
+    // Counted after the fact, so only the attempts that came to nothing do.
+    if ($error !== null && $registerWait === 0) {
+        LoginThrottle::recordAttempt($address);
     }
 }
 ?>

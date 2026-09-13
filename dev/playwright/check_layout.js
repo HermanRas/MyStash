@@ -21,8 +21,18 @@ const PASSWORD = process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg';
   await page.click('button[type="submit"]');
   await page.waitForSelector('.video-grid');
 
+  // Which video to open is discovered from the wall, never hardcoded.
+  // TestUser is a working stash: its videos get deleted and re-uploaded, so
+  // ids do not stay put — the demo entries 1-6 were replaced by 7-9 and every
+  // check that assumed `id=1` started timing out on a page that redirects.
+  const VIDEO_ID = await page.$eval(
+    'a[href*="video.php?id="]',
+    (a) => new URL(a.href, location.origin).searchParams.get('id'),
+  );
+  console.log(`  using video id ${VIDEO_ID} from the wall`);
+
   // The watch page is the reference the other two are being matched to.
-  await page.goto(`${BASE}/video.php?id=1`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/video.php?id=${VIDEO_ID}`, { waitUntil: 'networkidle' });
   const reference = await page.locator('.watch-layout').boundingBox();
   console.log(`  watch-layout: x=${Math.round(reference.x)} width=${Math.round(reference.width)}`);
 
@@ -62,7 +72,7 @@ const PASSWORD = process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg';
   }
 
   // --- the convert panel leads the page ---
-  await page.goto(`${BASE}/video.php?id=1`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/video.php?id=${VIDEO_ID}`, { waitUntil: 'networkidle' });
   const hasCard = await page.locator('#job-card').count();
 
   if (hasCard === 0) {

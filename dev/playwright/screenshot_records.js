@@ -19,6 +19,16 @@ const AVATAR = '/work/avatar_fixture.png';
   await page.fill('#password', PASSWORD);
   await page.click('button[type="submit"]');
   await page.waitForSelector('.video-grid');
+
+  // Which video to open is discovered from the wall, never hardcoded.
+  // TestUser is a working stash: its videos get deleted and re-uploaded, so
+  // ids do not stay put — the demo entries 1-6 were replaced by 7-9 and every
+  // check that assumed `id=1` started timing out on a page that redirects.
+  const VIDEO_ID = await page.$eval(
+    'a[href*="video.php?id="]',
+    (a) => new URL(a.href, location.origin).searchParams.get('id'),
+  );
+  console.log(`  using video id ${VIDEO_ID} from the wall`);
   check('logs in with the new 24-char password', page.url().includes('wall.php'));
 
   // --- top nav -----------------------------------------------------------
@@ -157,19 +167,19 @@ const AVATAR = '/work/avatar_fixture.png';
     favicon.ok() && favicon.headers()['content-type'].startsWith('image/'));
 
   // --- download: the way back out of the stash (4.30) --------------------
-  await page.goto(`${BASE}/video.php?id=1`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/video.php?id=${VIDEO_ID}`, { waitUntil: 'networkidle' });
 
   const title = (await page.locator('.watch-title').innerText()).trim();
   const downloadLink = page.locator('.form-actions a[href*="download=1"]');
   check('the watch page offers a download', await downloadLink.count() === 1);
 
-  const saved = await page.request.get(`${BASE}/media.php?id=1&type=video&download=1`);
+  const saved = await page.request.get(`${BASE}/media.php?id=${VIDEO_ID}&type=video&download=1`);
   const disposition = saved.headers()['content-disposition'] || '';
   console.log('  content-disposition:', disposition);
   check('it is sent as an attachment named after the video',
     disposition.includes('attachment') && disposition.includes(`${title}.mp4`));
 
-  const streamed = await page.request.get(`${BASE}/media.php?id=1&type=video`);
+  const streamed = await page.request.get(`${BASE}/media.php?id=${VIDEO_ID}&type=video`);
   check('the downloaded bytes are the whole video, same as the player streams',
     (await saved.body()).length === (await streamed.body()).length
       && (await saved.body()).length > 0);
