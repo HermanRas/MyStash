@@ -79,7 +79,7 @@ Quality follows the standard tiers, keyed on vertical pixel count (`p` = progres
 
 - **Video edit:** available from the video watch page; edits title, description, creators and category assignments. Quality and "not converted" are not editable — see §2.3.
 - **Creator edit:** available from the user dropdown in the nav bar ("manage creators"); edits name, age, gender, bio and profile picture. Renaming a creator repoints every video that referenced the old name; the creator's ID and files stay put.
-- **Delete:** removes a video (and its datastore files), or a Creator (and their record + profile picture, reassigning their videos to `default`).
+- **Delete:** removes a video (and its datastore files), or a Creator (and their record + profile picture). Deleting a creator **drops them from every video they were credited on** rather than reassigning the whole video, so a video credited to two people keeps the other; a video left with nobody falls back to `default` (see §3). `default` itself cannot be deleted.
 
 ### 2.6 Password Change
 
@@ -88,7 +88,7 @@ Quality follows the standard tiers, keyed on vertical pixel count (`p` = progres
 3. Order of operations: reprocess everything else first, then update `{user}.json.enc` last. While the index still opens with the old password, an interrupted run is retryable.
 4. While reprocessing, the previous encrypted file is kept alongside as `{name}.enc.old` until the run completes successfully, then removed. A failed re-encrypt restores that one archive from its `.old` and aborts before touching anything further.
 
-The re-encryption pass exists as `App/bin/rekey_user.php {user} {old} {new}`; the in-app form is still to come.
+The re-encryption pass is `App/src/Rekey.php`. It is reached from the account screen (`user.php` → `password_change.php`) and, because re-encrypting every archive is minutes of CPU-bound 7zip work, it runs as a detached background job rather than inside the request — the browser polls `job_status.php` for progress. `App/bin/rekey_user.php {user} {old} {new}` remains as the command-line entry to the same code, which is what makes an interrupted run retryable without a session.
 
 ### 2.7 Categories
 
