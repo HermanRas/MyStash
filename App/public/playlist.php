@@ -55,7 +55,7 @@ if ($editing !== null) {
     $rows = Playlists::videosOf($index, $editing);
     $totalSeconds = array_sum(array_map(static fn(array $v) => (int) ($v['length_seconds'] ?? 0), $rows));
     $headerActions = '<button type="button" class="icon-btn" id="add-videos-open">'
-        . '<img class="btn-icon" src="assets/img/icons/playlist.png" alt="">Add Videos</button>';
+        . '<img class="btn-icon" src="assets/img/icons/playlist-add.png" alt="">Add Videos</button>';
 }
 ?>
 <!doctype html>
@@ -95,7 +95,7 @@ if ($editing !== null) {
         <input type="text" id="playlist-name" name="name"
                maxlength="<?= Playlists::MAX_NAME_LENGTH ?>" required>
       </div>
-      <button type="submit" class="btn">Create</button>
+      <button type="submit" class="btn"><img class="btn-icon" src="assets/img/icons/playlist-add.png" alt="">Create</button>
     </form>
   </div>
 
@@ -204,7 +204,7 @@ if ($editing !== null) {
     <form action="playlist_delete.php" method="post" style="margin-top:20px;"
           onsubmit="return confirm('Delete the playlist &quot;<?= htmlspecialchars($editing['name'], ENT_QUOTES) ?>&quot;?\n\nThe videos on it are not deleted — only the list itself.');">
       <input type="hidden" name="id" value="<?= htmlspecialchars($editing['id'], ENT_QUOTES) ?>">
-      <button type="submit" class="btn secondary small">Delete playlist</button>
+      <button type="submit" class="btn secondary small"><img class="btn-icon" src="assets/img/icons/playlist-delete.png" alt="">Delete playlist</button>
     </form>
   </div>
 </main>
@@ -228,7 +228,7 @@ if ($editing !== null) {
 
     <div class="modal-head">
       <h2>Add videos</h2>
-      <button type="button" class="icon-btn square" id="add-videos-close" aria-label="Close">&times;</button>
+      <button type="button" class="icon-btn square" id="add-videos-close" aria-label="Close"><img class="btn-icon" src="assets/img/icons/close.png" alt=""></button>
     </div>
 
     <input type="search" class="modal-search" id="add-videos-search"

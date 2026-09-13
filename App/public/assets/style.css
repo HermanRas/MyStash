@@ -357,9 +357,34 @@ a {
 }
 
 .filter-title {
+  display: flex;
+  align-items: center;
   margin: 0 0 18px;
   font-size: 15px;
   font-weight: 700;
+}
+
+/* The panel's own scale. --icon-size is 28px, which is right for a nav pill
+   and far too loud beside a 12px uppercase group heading. */
+.filter-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  margin-right: 8px;
+  flex: 0 0 auto;
+}
+
+.filter-section .filter-icon {
+  width: 15px;
+  height: 15px;
+  margin-right: 7px;
+}
+
+/* summary is space-between with a chevron in ::after, so the icon and its
+   word have to be one item or the chevron stops being the last one. */
+.filter-summary-label {
+  display: flex;
+  align-items: center;
 }
 
 /* Each group is a native <details> accordion — no JS, and it keeps working
@@ -1469,6 +1494,26 @@ select option {
 .modal-head h2 {
   margin: 0;
   font-size: 16px;
+}
+
+/* The close mark at --icon-size is a heavy amber X that shouts louder than
+   anything in the dialog. A dismiss control should be findable, not the first
+   thing the eye lands on. */
+.modal-head .icon-btn.square {
+  width: 30px;
+  height: 30px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.modal-head .icon-btn.square .btn-icon {
+  width: 13px;
+  height: 13px;
+  opacity: 0.55;
+}
+
+.modal-head .icon-btn.square:hover .btn-icon {
+  opacity: 1;
 }
 
 .modal-search {

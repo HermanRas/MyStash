@@ -167,7 +167,7 @@ $navActive = 'videos';
 
     <?php if (!$editing): ?>
       <div class="form-actions">
-        <a class="btn secondary" href="video.php?id=<?= urlencode($id) ?>&edit=1">Edit Video</a>
+        <a class="btn secondary" href="video.php?id=<?= urlencode($id) ?>&edit=1"><img class="btn-icon" src="assets/img/icons/video-edit.png" alt="">Edit Video</a>
 
         <?php /* Built like the sort menu and the user menu — a trigger with a
                  panel that opens on hover or focus — so the three dropdowns on
@@ -292,7 +292,7 @@ $navActive = 'videos';
                        max="<?= (int) $video['length_seconds'] ?>"
                        value="<?= (int) ($previewCapture ?? 0) ?>" required>
               </div>
-              <button type="submit" class="btn secondary">Capture</button>
+              <button type="submit" class="btn secondary"><img class="btn-icon" src="assets/img/icons/camera.png" alt="">Capture</button>
             </form>
 
             <form action="video_preview.php" method="post" enctype="multipart/form-data" class="preview-row">
@@ -302,7 +302,7 @@ $navActive = 'videos';
                 <label for="preview-file">…or use your own picture</label>
                 <input type="file" id="preview-file" name="preview_image" accept="image/*" required>
               </div>
-              <button type="submit" class="btn secondary">Upload</button>
+              <button type="submit" class="btn secondary"><img class="btn-icon" src="assets/img/icons/image-upload.png" alt="">Upload</button>
             </form>
 
             <p class="hint" style="margin-bottom:0;">
@@ -358,7 +358,7 @@ $navActive = 'videos';
 
       <form class="form-actions" action="video_delete.php" method="post" onsubmit="return confirm('Delete this video permanently?');">
         <input type="hidden" name="id" value="<?= htmlspecialchars($id, ENT_QUOTES) ?>">
-        <button type="submit" class="btn secondary">Delete Video</button>
+        <button type="submit" class="btn secondary"><img class="btn-icon" src="assets/img/icons/video-delete.png" alt="">Delete Video</button>
       </form>
     <?php endif; ?>
   </div>

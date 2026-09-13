@@ -209,7 +209,7 @@ $headerActions = '<a class="icon-btn" href="creator.php?edit="><img class="btn-i
       <div class="form-actions">
         <button type="submit" form="creator-form" class="btn">Save Changes</button>
         <?php if ($editCreator && $editing !== 'default'): ?>
-          <button type="submit" form="creator-delete-form" class="btn secondary">Delete Creator</button>
+          <button type="submit" form="creator-delete-form" class="btn secondary"><img class="btn-icon" src="assets/img/icons/creator-delete.png" alt="">Delete Creator</button>
         <?php endif; ?>
       </div>
     </div>

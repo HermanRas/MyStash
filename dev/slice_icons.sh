@@ -2,30 +2,41 @@
 # Slices a generated icon sheet into the transparent PNGs the UI loads
 # (Docs/SPECIFICATIONS.md §4.0).
 #
-# The sheets come out of Gemini as a 4x4 grid on a flat background — black on
-# the first sheet, white on icons_v2.png, which turned out not to matter: the
-# amber keys off either one just as cleanly, so a sheet does not need
-# regenerating for its background alone.
+# The sheets come out of Gemini as a 4x4 grid of flat amber icons. Successive
+# revisions have arrived on black, on white, and on a noisy near-black with
+# faint grid lines, so nothing here may assume a background colour beyond the
+# one it is told to key.
 #
-# Three passes per cell:
-#   1. crop the 256x256 cell out of the 1024x1024 sheet;
-#   2. find the icon's real bounds inside it, so every icon ends up trimmed to
-#      its own ink rather than to whatever padding the generator left — without
-#      this, icons render at wildly different visual weights for the same
-#      --icon-size;
-#   3. key the background out and normalise the longest edge to 96px.
+# Per cell:
+#   1. crop the 256x256 cell, inset a little to drop the grid line;
+#   2. key the background out;
+#   3. find the icon's bounds FROM THE RESULTING ALPHA, not from the colour
+#      image. An earlier version ran cropdetect over the colour cell and was
+#      quietly wrong — the sheet's background is not uniform (JPEG-ish noise
+#      around #141503), so the luma threshold clipped real ink and shipped a
+#      register icon with its lower half missing. The alpha channel after
+#      keying is a clean two-value mask, and cropdetect on that cannot
+#      disagree with what will actually be drawn;
+#   4. crop to those bounds plus a small margin, and normalise the longest
+#      edge to 96px so every icon carries the same weight at one --icon-size.
 #
-# ffmpeg lives in the php container, so the work happens there; Docs/ is not
-# mounted into it, hence the copy in.
+# ffmpeg lives in the php container, and Docs/ is not mounted into it, hence
+# the copy in.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 SHEET="${1:-Docs/Assets/icons_v2.png}"
-KEY="${2:-0xFFFFFF}"          # 0x000000 for a black sheet
+KEY="${2:-0x000000}"          # 0xFFFFFF for a white sheet
 OUT="App/public/assets/img/icons"
 
-# Cell names, left to right and top to bottom. An empty name skips the cell,
-# which is what the mostly-blank v3 sheet needs.
+# Enough to swallow the background's noise without reaching the amber. The
+# icons' own black cut-outs (the film strips' sprockets and play triangles) go
+# transparent too, which is what they should do on a dark UI.
+TOL="0.22:0.06"
+
+INSET=6                        # px of grid line to drop on each side
+MARGIN=3                       # px of breathing room to add back after trimming
+
 NAMES=(
   upload   download  creator   sort-az
   sort-za  sort-09   sort-90   tag
@@ -34,48 +45,57 @@ NAMES=(
 )
 
 if [ "$(basename "$SHEET")" = "icons_v3.png" ]; then
-  NAMES=(filter video-delete creator-delete "" "" "" "" "" "" "" "" "" "" "" "" "")
+  NAMES=(
+    filter         video-delete  creator-delete  video-download
+    video-edit     category-add  image-upload    camera
+    close          palette       category-delete playlist-add
+    playlist-delete ""           ""              ""
+  )
 fi
 
 docker compose cp "$SHEET" php:/tmp/sheet.png >/dev/null
-echo "slicing $(basename "$SHEET") (keying ${KEY})"
+echo "slicing $(basename "$SHEET"), keying ${KEY}"
 
 for i in "${!NAMES[@]}"; do
   name="${NAMES[$i]}"
   [ -z "$name" ] && continue
 
-  x=$(( (i % 4) * 256 ))
-  y=$(( (i / 4) * 256 ))
+  x=$(( (i % 4) * 256 + INSET ))
+  y=$(( (i / 4) * 256 + INSET ))
+  side=$(( 256 - INSET * 2 ))
 
+  # 1 + 2: the cell, with the background already gone.
   docker compose exec -T php ffmpeg -v error -y -i /tmp/sheet.png \
-    -vf "crop=256:256:${x}:${y}" /tmp/cell.png
+    -vf "crop=${side}:${side}:${x}:${y},format=rgba,colorkey=${KEY}:${TOL}" /tmp/keyed.png
 
-  # The icon's own bounds. cropdetect looks for *dark* borders, so a light
-  # sheet has to be negated first and a dark one must not be — negating a
-  # black sheet made it report the whole cell every time, which silently
-  # produced icons at a quarter of the intended size.
-  #
-  # It also needs more than one frame before it will report anything, which is
-  # what the loop is for.
-  PRE=""
-  [ "$KEY" = "0xFFFFFF" ] && PRE="negate,"
-
+  # 3: bounds from the alpha. cropdetect needs more than one frame before it
+  # reports, which is what the loop is for.
   BOX=$(docker compose exec -T php sh -c \
-    "ffmpeg -v info -loop 1 -t 0.4 -i /tmp/cell.png -vf '${PRE}cropdetect=limit=0.08:round=2:reset=0' -f null - 2>&1 | grep -o 'crop=[0-9:]*' | tail -1")
-  BOX="${BOX#crop=}"
-  BOX="$(printf '%s' "$BOX" | tr -d '\r')"
+    "ffmpeg -v info -loop 1 -t 0.4 -i /tmp/keyed.png -vf 'alphaextract,cropdetect=limit=0:round=2:reset=0' -f null - 2>&1 | grep -o 'crop=[0-9]*:[0-9]*:[0-9]*:[0-9]*' | tail -1")
+  BOX="$(printf '%s' "${BOX#crop=}" | tr -d '\r')"
 
   if [ -z "$BOX" ]; then
-    echo "  SKIP ${name}: nothing found in that cell"
+    echo "  skip ${name} — nothing opaque in that cell"
     continue
   fi
 
-  docker compose exec -T php ffmpeg -v error -y -i /tmp/cell.png \
-    -vf "crop=${BOX},colorkey=${KEY}:0.18:0.02,scale='if(gt(iw,ih),96,-1)':'if(gt(iw,ih),-1,96)'" \
+  IFS=: read -r cw ch cx cy <<< "$BOX"
+
+  # 4: give the trim a margin back, clamped inside the cell, so a detection
+  # that is a pixel or two keen still cannot cut ink.
+  nx=$(( cx - MARGIN < 0 ? 0 : cx - MARGIN ))
+  ny=$(( cy - MARGIN < 0 ? 0 : cy - MARGIN ))
+  nw=$(( cw + (cx - nx) + MARGIN ))
+  nh=$(( ch + (cy - ny) + MARGIN ))
+  [ $(( nx + nw )) -gt "$side" ] && nw=$(( side - nx ))
+  [ $(( ny + nh )) -gt "$side" ] && nh=$(( side - ny ))
+
+  docker compose exec -T php ffmpeg -v error -y -i /tmp/keyed.png \
+    -vf "crop=${nw}:${nh}:${nx}:${ny},scale='if(gt(iw,ih),96,-1)':'if(gt(iw,ih),-1,96)':flags=lanczos" \
     "/tmp/icon-${name}.png"
 
   docker compose cp "php:/tmp/icon-${name}.png" "${OUT}/${name}.png" >/dev/null
-  echo "  ${name}.png  (from ${BOX})"
+  printf '  %-16s %s\n' "${name}.png" "${nw}x${nh}+${nx}+${ny}"
 done
 
 echo "done — $(ls -1 ${OUT} | wc -l) icons in ${OUT}"

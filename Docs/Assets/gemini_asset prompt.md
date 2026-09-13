@@ -4,9 +4,9 @@ we are creating icon for my site.
 ## site icons v2
 4x4 solid black background, no dividing lines, all icons are flat #ffa31a color icons, fill the grid top left to bottom right, cells with no image are left blank
 
-1- an video upload icon
-2- an video download icon
-3- an creator icon
+1- video upload icon
+2- video download icon
+3- creator icon
 4- A-Z sorting icon
 5- Z-A sorting icon
 6- 0-9 sorting icon
@@ -21,7 +21,7 @@ we are creating icon for my site.
 15- collapse icon
 16- playlist icon
 ---
-## site icons v2
+## site icons v3
 4x4 solid black background, no dividing lines, all icons are flat #ffa31a color icons, fill the grid top left to bottom right, cells with no image are left blank
 
 1- filter icon
@@ -37,9 +37,9 @@ we are creating icon for my site.
 11- delete label icon
 12- create playlist icon
 13- delete playlist icon
-14- blank
-15- blank
-16- blank
+14- save creator icon
+15- rename playlist icon
+16- remove video icon
 ---
 
 

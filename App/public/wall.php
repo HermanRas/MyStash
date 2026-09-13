@@ -110,7 +110,9 @@ $headerActions = '<button class="icon-btn square" id="upload-toggle" title="Uplo
 
 <div class="layout">
   <aside class="filter-panel" id="filter-panel">
-    <h2 class="filter-title">Filters</h2>
+    <h2 class="filter-title">
+      <img class="filter-icon" src="assets/img/icons/filter.png" alt="">Filters
+    </h2>
 
     <form method="get" action="wall.php" id="filter-form">
       <input type="hidden" name="sort" value="<?= htmlspecialchars($query->sort, ENT_QUOTES) ?>">
@@ -121,7 +123,7 @@ $headerActions = '<button class="icon-btn square" id="upload-toggle" title="Uplo
                one open by default; the others remember nothing between loads
                beyond whether a filter in them is active. */ ?>
       <details class="filter-section" open>
-        <summary>Categories</summary>
+        <summary><span class="filter-summary-label"><img class="filter-icon" src="assets/img/icons/tag.png" alt="">Categories</span></summary>
         <?php foreach ($categories as $name => $color): ?>
           <div class="filter-row">
             <label class="check-row">
@@ -138,7 +140,7 @@ $headerActions = '<button class="icon-btn square" id="upload-toggle" title="Uplo
       </details>
 
       <details class="filter-section" <?= $query->minMinutes > 0 || $query->maxMinutes < VideoQuery::MAX_LENGTH_MINUTES ? 'open' : '' ?>>
-        <summary>Videos</summary>
+        <summary><span class="filter-summary-label"><img class="filter-icon" src="assets/img/icons/videos.png" alt="">Videos</span></summary>
         <div class="filter-row">
           <label>Longer than <output id="len-min-out"><?= $query->minMinutes ?>m</output></label>
           <input type="range" id="len-min" name="len_min" min="0" max="<?= VideoQuery::MAX_LENGTH_MINUTES ?>" step="1" value="<?= $query->minMinutes ?>">
@@ -150,7 +152,7 @@ $headerActions = '<button class="icon-btn square" id="upload-toggle" title="Uplo
       </details>
 
       <details class="filter-section" <?= $query->creators !== [] || $query->filtersByCreatorAttributes() ? 'open' : '' ?>>
-        <summary>Creators</summary>
+        <summary><span class="filter-summary-label"><img class="filter-icon" src="assets/img/icons/creator.png" alt="">Creators</span></summary>
         <?php foreach (array_keys($creators) as $name): ?>
           <div class="filter-row">
             <label class="check-row">
