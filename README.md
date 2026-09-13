@@ -7,8 +7,9 @@ encrypted at rest with your password, which is never stored anywhere — and
 nothing on any page is fetched from anyone else's server.
 
 ```bash
-git clone <your-remote> mystash && cd mystash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+git clone https://github.com/HermanRas/MyStash.git mystash && cd mystash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
 Then open <http://127.0.0.1:8080> and create a stash. Full instructions,

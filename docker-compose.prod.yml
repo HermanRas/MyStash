@@ -1,23 +1,33 @@
 # Production overlay: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
-# Three differences from the development stack, and each one is a decision:
+# Four differences from the development stack, and each one is a decision:
 #
-#  - the code is mounted read-only into the container, with only the
-#    datastore writable. Every persistent write this app makes lands under
-#    App/Data; sessions, job records, decrypt staging and the login counters
-#    are all in /dev/shm. Nothing writes to App/src or App/public at run time,
-#    so nothing needs permission to.
+#  - the image is the one CI built and published, not one built here. Every
+#    push to main builds the container, starts it, checks it serves the app and
+#    runs the smoke suite before publishing (.github/workflows/image.yml), so
+#    what runs in production is an artefact that has already been started once
+#    and talked to. Set MYSTASH_TAG to pin a specific commit — the workflow
+#    publishes sha-<commit> alongside latest — which is also how you roll back.
+#  - the code is not mounted at all. The base file bind-mounts ./App over /app
+#    for development; leaving that in place would put this host's working copy
+#    straight over the image that was just pulled, so the mount is replaced
+#    with the only two paths production actually needs from the host: the
+#    datastore, and the hardened php.ini.
 #  - the published port is bound to the loopback interface. There is no TLS in
-#    front of this — see Docs/DEPLOY.md — and the password is the encryption
+#    front of this — see Docs/DEPLOY.md §4 — and the password is the encryption
 #    key, so it must not cross a network in the clear.
 #  - the container comes back after a reboot, and PHP stops rendering its
 #    errors to the browser (App/php.prod.ini).
 services:
   app:
+    image: ghcr.io/hermanras/mystash:${MYSTASH_TAG:-latest}
+    # Nothing is built here. Without this the base file's `build:` still
+    # applies and `up --build` would quietly replace the published image with
+    # one compiled from whatever is in this working tree.
+    build: !reset null
     ports: !override
       - "127.0.0.1:8080:8080"
     volumes: !override
-      - ./App:/app:ro
       - ./App/Data:/app/Data
       # Loaded after mystash.ini — conf.d is read in alphabetical order, and
       # zz sorts last — so these win where the two disagree.

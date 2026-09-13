@@ -29,8 +29,9 @@ image.
 ## 2. The short version
 
 ```bash
-git clone <your-remote> mystash && cd mystash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+git clone https://github.com/HermanRas/MyStash.git mystash && cd mystash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
 Then open <http://127.0.0.1:8080> and create a stash.
@@ -38,45 +39,61 @@ Then open <http://127.0.0.1:8080> and create a stash.
 That is a complete, working deployment **for one machine, used locally**. If
 anyone reaches it over a network, read §4 before you tell them the address.
 
-### Or pull the image instead of building it
+The repository is still cloned even though nothing is built from it: the
+compose files, `App/php.prod.ini` and the `App/Data` directory all come from
+it. The application code does not — that is in the image.
 
-Every push to `main` builds the container, starts it, checks it serves the app
-and runs the smoke suite, and only then publishes it
-(`.github/workflows/image.yml`):
+**If the pull is denied**, the GHCR package is private. Packages start private
+even on a public repository. Either make it public in the package settings on
+GitHub, or log in first with a personal access token that has `read:packages`:
 
+```bash
+echo "$GITHUB_TOKEN" | docker login ghcr.io -u <your-username> --password-stdin
 ```
-ghcr.io/hermanras/mystash:latest
-ghcr.io/hermanras/mystash:sha-<commit>
+
+### What you are running, and how to build it yourself instead
+
+`docker-compose.prod.yml` runs `ghcr.io/hermanras/mystash`. Every push to
+`main` builds that image, starts it, checks it serves the app and runs the
+smoke suite, and only then publishes it (`.github/workflows/image.yml`) — so a
+published tag is an artefact that has already been started once and talked to,
+not just one that compiled.
+
+Two tags are published:
+
+| Tag | Use |
+| --- | --- |
+| `latest` | what the overlay pulls by default |
+| `sha-<commit>` | pin a known-good build, and roll back to it |
+
+The commit is the full 40-character SHA, as `git rev-parse HEAD` prints it:
+
+```bash
+MYSTASH_TAG=sha-$(git rev-parse HEAD) docker compose \
+  -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
-Pulling it rather than building saves a few minutes and an `ffmpeg` compile on
-a small host. It needs one change, and the change is the point: the compose
-files bind-mount `./App` over `/app`, which would put the host's copy of the
-code back on top of the image you just pulled. Use an overlay that replaces
-both:
+Running an image you did not build is a real thing to weigh: you are trusting
+GitHub's builder and the commit it built from, rather than a working tree you
+can read. `sha-` tags exist so you can at least name exactly which commit is
+running. To build on the host instead, drop the overlay's image and let the
+base file's `build:` apply:
 
 ```yaml
-# docker-compose.pull.yml
+# docker-compose.local.yml
 services:
   app:
-    image: ghcr.io/hermanras/mystash:latest
-    build: !reset null
-    volumes: !override
-      - ./App/Data:/app/Data
-      - ./App/php.prod.ini:/usr/local/etc/php/conf.d/zz-mystash-prod.ini:ro
+    image: !reset null
+    build: ./App
 ```
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-               -f docker-compose.pull.yml pull
-docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-               -f docker-compose.pull.yml up -d
+               -f docker-compose.local.yml up -d --build
 ```
 
-Note what you are trusting when you do this: an image built by GitHub from a
-commit, rather than one you built from a working tree you can see. The `sha-`
-tag exists so you can name exactly which commit is running. Building on the
-host stays the default in §2 for that reason.
+That needs the code, so the `./App` mount the prod overlay removed is not
+needed either way — the image built from `./App` already contains it.
 
 ---
 
@@ -87,7 +104,7 @@ There are three compose files and they layer:
 | File | What it adds |
 | --- | --- |
 | `docker-compose.yml` | the app itself: the one `app` container, port 8080, the 2 GB `/dev/shm` |
-| `docker-compose.prod.yml` | loopback-only port, read-only code, `restart: unless-stopped`, `App/php.prod.ini` |
+| `docker-compose.prod.yml` | the published GHCR image, loopback-only port, no code mount, `restart: unless-stopped`, `App/php.prod.ini` |
 | `docker-compose.dev.yml` | the Playwright container the `dev/` checks drive |
 
 Used as:
@@ -138,12 +155,19 @@ what the page no longer shows. Verify it:
 docker compose exec app php -i | grep -E '^display_errors|^zend.exception_ignore_args'
 ```
 
-**The code is mounted read-only.** Only `App/Data` is writable. Every
-persistent write this application makes lands there; sessions, job records,
-decrypt staging and the login counters are all in `/dev/shm`. Nothing writes
-to `App/src` or `App/public` at run time, so nothing needs permission to — and
-an upload that found a way to place a file in the web root would have nowhere
-to put it.
+**The code is not mounted at all — it is in the image.** The only writable
+path is `App/Data`. Every persistent write this application makes lands there;
+sessions, job records, decrypt staging and the login counters are all in
+`/dev/shm`. Nothing writes to `App/src` or `App/public` at run time, so the
+application never needed them writable. The code in the image is owned by
+root and mode 0755, and php-fpm runs as `www-data`, so an upload that found a
+way to place a file in the web root would be refused by the filesystem — and
+would in any case be writing into a container layer, not onto the host.
+
+The development stack still bind-mounts `./App` over `/app`, which is what
+makes editing a file take effect without a rebuild. That mount is exactly what
+the production overlay removes: leaving it would put whatever is in the
+deployment host's working tree on top of the image that was pulled.
 
 **The session cookie is hardened.** `HttpOnly`, `SameSite=Lax` and
 `session.use_strict_mode`. The cookie is the key to a decrypted stash for as
@@ -300,9 +324,14 @@ docker compose start app
 ## 8. Upgrading
 
 ```bash
-git pull
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+git pull   # the compose files and php.prod.ini
+docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
+
+- **Note which of those two pulls matters.** `git pull` updates the compose
+  files and `App/php.prod.ini`; `docker compose pull` updates the application.
+  Doing only the first changes nothing about the code that runs.
 
 - **Do not upgrade while a re-key is running.** Changing a stash's password
   rewrites every archive in it and keeps `.enc.old` copies until the run
