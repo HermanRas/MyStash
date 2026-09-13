@@ -17,6 +17,17 @@
 | PHP `exec`/`proc_open` | Shell out to `ffmpeg` and `7z` | No PHP extension for either exists that's production-safe — CLI invocation is the standard approach |
 | (Optional) `ffprobe` | Read video metadata (duration, codec, resolution) on upload | Ships with ffmpeg |
 
+### Nothing is fetched from anywhere else
+
+No page loads a script, stylesheet, font or image from a host other than this
+app. Everything the browser needs ships in `App/public/assets/`, including the
+display face (`assets/fonts/carter-one-latin-400.woff2`, SIL OFL 1.1, licence
+alongside it). This is not performance: the point of a stash encrypted at rest
+on a machine you control is defeated if opening it announces that to a CDN, and
+the site has to work with no internet connection at all. `dev/run_font_check.sh`
+records every request the browser makes across the site and fails if any of them
+leaves this origin.
+
 ## 2. App Flow
 
 ### 2.1 Registration & Login

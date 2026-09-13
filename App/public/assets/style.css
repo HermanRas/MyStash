@@ -1,19 +1,30 @@
 /* Carter One, the display face, for the brand and page headings only.
-   On trial — see the note below before this becomes permanent.
 
-   One @import rather than a <link> in each of the eight <head>s on the site.
-   It costs the preconnect hints, which matter for a first paint; if the face
-   stays, the links belong in views/header.php and the auth pages instead.
+   Served from assets/fonts/, not from Google. It was an @import while the
+   face was on trial, which meant every page load of a private, encrypted,
+   self-hosted stash made a request to fonts.googleapis.com — the one thing
+   this app exists to avoid. The whole face is 28KB for the latin subset,
+   cached after the first page, and works with no network at all.
 
-   NOTE: this fetches from Google on every page load, from an app whose whole
-   premise is that nothing leaves the machine. Self-hosting the woff2 in
-   assets/ is two files and removes the call entirely. */
-@import url('https://fonts.googleapis.com/css2?family=Carter+One&display=swap');
+   Licensed under the SIL Open Font License 1.1; assets/fonts/OFL.txt is the
+   copy the licence requires to travel with the file.
+
+   No unicode-range: Google's stylesheet carries one so the browser can pick
+   between subsets, and there is only this one. */
+@font-face {
+  font-family: 'Carter One';
+  font-style: normal;
+  font-weight: 400;
+  /* swap, not block: a heading in the fallback face for a frame beats a
+     heading that is not there at all. */
+  font-display: swap;
+  src: url('fonts/carter-one-latin-400.woff2') format('woff2');
+}
 
 :root {
-  /* The stack's fallbacks matter: Carter One is fetched over the network, so
-     every heading renders in one of these until it lands — or for good, if
-     the machine is offline. */
+  /* The fallbacks still matter: the face is local now, but it is still a
+     download the first paint may beat, so every heading renders in one of
+     these for a frame. */
   --font-display: 'Carter One', 'Trebuchet MS', system-ui, sans-serif;
   /* One height for every form control on the site. Buttons were 40px and the
      inputs beside them were whatever their padding worked out to, so a row of
