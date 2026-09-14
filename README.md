@@ -6,10 +6,32 @@ A private, self-hosted video wall for a personal library. Everything is
 encrypted at rest with your password, which is never stored anywhere — and
 nothing on any page is fetched from anyone else's server.
 
+
+*DEV*
+
 ```bash
 git clone https://github.com/HermanRas/MyStash.git mystash && cd mystash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+*PROD*
+
+```yml
+services:
+  app:
+    image: ghcr.io/hermanras/mystash:latest
+    ports:
+      - "127.0.0.1:8080:8080"
+    container_name: mystash-app
+    volumes:
+      - /path/to/your/data:/app/Data
+    # Not optional. Every decrypt, and every upload, stages plaintext in
+    # /dev/shm; Docker's default is 64M, which is smaller than one video.
+    # Leave this out and uploads fail with "No space left on device" while
+    # the host still has terabytes free. See Docs/DEPLOY.md §6.
+    shm_size: 4gb
+    restart: unless-stopped
 ```
 
 Then open <http://127.0.0.1:8080> and create a stash. Full instructions,
@@ -74,7 +96,8 @@ App/
   tests/           the smoke suite (227 checks)
   Data/            the encrypted datastore — gitignored, never leaves the host
   nginx.conf       the web server's whole configuration
-  php.ini          upload limits; php.prod.ini adds the production hardening
+  php.ini          upload limits; php.prod.ini is the production hardening, baked
+                   into the image and active unless MYSTASH_DEV=1
   docker-entrypoint.sh   starts nginx and PHP-FPM, and takes the container
                          down if either of them stops
 Docs/

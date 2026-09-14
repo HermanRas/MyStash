@@ -405,6 +405,34 @@ h3,
   min-width: 220px;
 }
 
+/* [hidden] loses to the display:flex above, so the form would still be laid
+   out while a transfer is running. */
+.upload-panel form[hidden] {
+  display: none;
+}
+
+/* The progress card sits where the form was, so the panel does not jump. */
+.upload-progress {
+  max-width: 560px;
+}
+
+.upload-progress .section-title {
+  /* The filename can be long and has no spaces to break on. */
+  overflow-wrap: anywhere;
+}
+
+.upload-progress #upload-cancel {
+  margin-top: 12px;
+}
+
+/* Sending the bytes has an honest percentage; the ingestion that follows does
+   not, so the bar sweeps for that half exactly as the conversion job's does. */
+.upload-progress.indeterminate .progress-bar {
+  width: 35% !important;
+  transition: none;
+  animation: job-sweep 1.4s ease-in-out infinite;
+}
+
 .upload-panel input[type="number"] {
   width: 100%;
   height: var(--control-h);

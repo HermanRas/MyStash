@@ -9,6 +9,15 @@
 # unless-stopped` needs in order to mean anything.
 set -uo pipefail
 
+# Hardened PHP settings are the default and dev opts out, rather than prod
+# opting in. conf.d is read alphabetically and zz sorts last, so these win
+# wherever they disagree with mystash.ini.
+if [ "${MYSTASH_DEV:-0}" != "1" ]; then
+  cp /usr/local/etc/php/mystash-prod.ini /usr/local/etc/php/conf.d/zz-mystash-prod.ini
+else
+  rm -f /usr/local/etc/php/conf.d/zz-mystash-prod.ini
+fi
+
 php-fpm --nodaemonize &
 FPM=$!
 

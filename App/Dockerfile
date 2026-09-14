@@ -30,6 +30,13 @@ WORKDIR /app
 
 COPY . /app
 COPY php.ini /usr/local/etc/php/conf.d/mystash.ini
+# Staged outside conf.d, not in it: the entrypoint moves it into place
+# unless MYSTASH_DEV=1. Production hardening therefore applies to anyone
+# who runs this image without saying otherwise, which is the way round it
+# needs to be — a deployment that forgets the file gets a container that
+# prints PHP notices to the browser, and that is how a full /dev/shm
+# surfaced as a stack trace on mystash.dragoon.co.za instead of a log line.
+COPY php.prod.ini /usr/local/etc/php/mystash-prod.ini
 COPY php-fpm.conf /usr/local/etc/php-fpm.d/zz-mystash.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 # --chmod rather than relying on the mode in the checkout: this repository is

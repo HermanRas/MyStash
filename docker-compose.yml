@@ -14,7 +14,19 @@ services:
       - "8080:8080"
     volumes:
       - ./App:/app
+    # Development only. The image hardens PHP by default — display_errors off,
+    # errors to the log — so that a deployment which forgets to say anything
+    # gets the safe settings. Here we do want the stack trace on the page.
+    environment:
+      MYSTASH_DEV: "1"
     # Every decrypt stages plaintext in /dev/shm — the extract dirs, the convert
     # work dirs, the sessions and the job records. Docker's default is 64M,
     # which is smaller than a single video: extraction would simply fail.
-    shm_size: 2gb
+    #
+    # 4gb, not the 2gb this was: ingest stages the whole original there while
+    # it encrypts, and a convert stages the original *and* the output. With
+    # upload_max_filesize at 2G (App/php.ini), 2gb could not hold a maximum
+    # upload at all — which is precisely how prod died on a 101MB video with a
+    # 64M /dev/shm, and would have died again at 2gb on a large one. tmpfs
+    # allocates lazily, so the higher ceiling costs nothing until it is used.
+    shm_size: 4gb

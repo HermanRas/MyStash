@@ -18,7 +18,7 @@ plaintext goes** and **what a backup is worth without the password.**
 | --- | --- |
 | Docker Engine + Compose v2 | `docker compose version` should report v2.24 or newer — the production overlay uses `!override` and §2 uses `!reset`, neither of which is in older versions |
 | Disk | the size of your library, plus room for one video at a time while it is being converted |
-| RAM | 2 GB free for `/dev/shm` on top of whatever else the host does (see §6) |
+| RAM | 4 GB free for `/dev/shm` on top of whatever else the host does (see §6) |
 | A host you trust | the password is typed into this app, held in RAM for the session, and never stored |
 
 Nothing else. No PHP, no ffmpeg and no 7-Zip on the host — they are in the
@@ -40,8 +40,10 @@ That is a complete, working deployment **for one machine, used locally**. If
 anyone reaches it over a network, read §4 before you tell them the address.
 
 The repository is still cloned even though nothing is built from it: the
-compose files, `App/php.prod.ini` and the `App/Data` directory all come from
-it. The application code does not — that is in the image.
+compose files and the `App/Data` directory come from it. The application code
+does not — nor does `php.prod.ini`, which is baked into the image and applied
+unless `MYSTASH_DEV=1`, so a deployment gets the hardened settings whether or
+not it remembers to ask for them.
 
 **If the pull is denied**, the GHCR package is private. Packages start private
 even on a public repository. Either make it public in the package settings on
@@ -120,8 +122,8 @@ There are three compose files and they layer:
 
 | File | What it adds |
 | --- | --- |
-| `docker-compose.yml` | the app itself: the one `app` container, port 8080, the 2 GB `/dev/shm` |
-| `docker-compose.prod.yml` | the published GHCR image, loopback-only port, no code mount, `restart: unless-stopped`, `App/php.prod.ini` |
+| `docker-compose.yml` | the app itself: the one `app` container, port 8080, the 4 GB `/dev/shm`, `MYSTASH_DEV=1` |
+| `docker-compose.prod.yml` | the published GHCR image, loopback-only port, no code mount, `restart: unless-stopped`, `MYSTASH_DEV=0` |
 | `docker-compose.dev.yml` | the Playwright container the `dev/` checks drive |
 
 Used as:
@@ -240,7 +242,11 @@ server {
 ```
 
 Then **uncomment `session.cookie_secure = 1`** in `App/php.prod.ini` and
-restart PHP. Do this only once TLS is actually in front: with it set, the
+rebuild — the file now ships inside the image, so editing your checkout alone
+changes nothing in production until CI republishes it and you pull. To set it
+without waiting for a build, add `- ./php-extra.ini:/usr/local/etc/php/conf.d/zzz-local.ini:ro`
+to the compose file instead (`zzz` sorts after `zz-mystash-prod.ini`) and
+restart. Do this only once TLS is actually in front: with it set, the
 browser will not send the cookie over plain HTTP at all, and the symptom is a
 login that appears to succeed and bounces straight back to the login screen.
 
@@ -287,13 +293,30 @@ Do that on a development instance, not on the machine holding real data.
 
 ## 6. Sizing and limits
 
-**`/dev/shm` is 2 GB and that number is load-bearing.** Every decrypt stages
+**`/dev/shm` is 4 GB and that number is load-bearing.** Every decrypt stages
 plaintext there: playing a video extracts it, converting one extracts it,
-uploading one writes previews there, and re-keying works through the whole
-stash. Docker's default is 64 MB, which is smaller than a single video —
-extraction simply fails. If your videos are larger than about 1 GB, raise
-`shm_size` in `docker-compose.yml` to comfortably exceed the largest file you
-will hold, because the original and the conversion can both be resident.
+uploading one stages the whole original there while it encrypts, and re-keying
+works through the whole stash. Docker's default is 64 MB, which is smaller than
+a single video — extraction simply fails.
+
+This is not a theoretical limit. A hand-written production compose file that
+omitted `shm_size` entirely ran on the 64 MB default, and a 101 MB upload died
+with `move_uploaded_file(): … errno=28 No space left on device` while the host
+had 1.8 TB free — because the device that was full was the container's
+`/dev/shm`, not the disk. **Any compose file you write by hand must carry
+`shm_size`**; it is repeated in `docker-compose.prod.yml` and in the README
+snippet for exactly that reason. Check a running container with:
+
+```bash
+docker exec mystash-app df -h /dev/shm        # Size must not read 64M
+docker inspect mystash-app --format '{{.HostConfig.ShmSize}}'
+```
+
+4 GB is sized against the 2 GB upload cap below: a convert holds the original
+*and* the output at once, so the ceiling has to be comfortably more than twice
+the largest video you will hold. Raise both together if you raise either.
+tmpfs allocates lazily, so a higher ceiling costs nothing until it is used —
+but it is a ceiling on RAM, so do not set it near the host's total.
 
 **Uploads are capped in two places** and both have to agree: `client_max_body_size`
 in `App/nginx.conf` and `upload_max_filesize` / `post_max_size` in
@@ -341,14 +364,15 @@ docker compose start app
 ## 8. Upgrading
 
 ```bash
-git pull   # the compose files and php.prod.ini
+git pull   # the compose files
 docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
 - **Note which of those two pulls matters.** `git pull` updates the compose
-  files and `App/php.prod.ini`; `docker compose pull` updates the application.
-  Doing only the first changes nothing about the code that runs.
+  files; `docker compose pull` updates the application — and now also
+  `php.prod.ini`, which travels in the image. Doing only the first changes
+  nothing about the code that runs.
 
 - **Do not upgrade while a re-key is running.** Changing a stash's password
   rewrites every archive in it and keeps `.enc.old` copies until the run

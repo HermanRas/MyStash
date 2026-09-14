@@ -95,11 +95,38 @@ $headerActions = '<button class="icon-btn square" id="upload-toggle" title="Uplo
 // it: the message belongs beside the form that produced it, and a notice on
 // a collapsed panel is a notice nobody reads.
 $uploadError = (string) ($_GET['upload_error'] ?? '');
+
+// The smaller of the two limits PHP applies, in bytes, so the progress card
+// can refuse an oversized file before sending it rather than after. They are
+// both 2G in App/php.ini today, but reading them beats hard-coding a number
+// that stops being true the moment php.ini is edited.
+$toBytes = static function (string $value): int {
+    $value = trim($value);
+    if ($value === '') {
+        return 0;
+    }
+    $unit = strtolower(substr($value, -1));
+    $number = (int) $value;
+
+    return match ($unit) {
+        'g' => $number * 1024 * 1024 * 1024,
+        'm' => $number * 1024 * 1024,
+        'k' => $number * 1024,
+        default => $number,
+    };
+};
+$uploadLimit = min(
+    array_filter([
+        $toBytes((string) ini_get('upload_max_filesize')),
+        $toBytes((string) ini_get('post_max_size')),
+    ]) ?: [0],
+);
 ?>
 <div class="upload-panel<?= $uploadError !== '' ? ' open' : '' ?>" id="upload-panel">
-  <?php if ($uploadError !== ''): ?>
-    <p class="upload-error"><?= htmlspecialchars($uploadError, ENT_QUOTES) ?></p>
-  <?php endif; ?>
+  <?php /* Always rendered, so upload.js has somewhere to put a failure it
+           discovers itself (an aborted transfer, a file over the limit) without
+           building the element on the fly. */ ?>
+  <p class="upload-error"<?= $uploadError === '' ? ' hidden' : '' ?>><?= htmlspecialchars($uploadError, ENT_QUOTES) ?></p>
   <form action="upload.php" method="post" enctype="multipart/form-data">
     <div class="field">
       <label for="video-file">Video file</label>
@@ -119,6 +146,19 @@ $uploadError = (string) ($_GET['upload_error'] ?? '');
     </div>
     <button type="submit" class="btn">Upload</button>
   </form>
+
+  <?php /* Hidden until a transfer starts, and only ever shown by upload.js —
+           with JS off the form posts straight to upload.php as it always has
+           and this card is never revealed. Same .progress/.progress-bar as the
+           conversion job card on the watch page: one progress bar in the app,
+           not two that drifted apart. */ ?>
+  <div class="card upload-progress" id="upload-progress" hidden
+       data-max-bytes="<?= $uploadLimit ?>">
+    <div class="section-title" style="margin-top:0;" id="upload-message">Uploading</div>
+    <div class="progress"><div class="progress-bar" id="upload-bar"></div></div>
+    <p class="hint job-message" id="upload-detail"></p>
+    <button type="button" class="btn secondary small" id="upload-cancel">Cancel</button>
+  </div>
 </div>
 
 <div class="layout">
@@ -348,6 +388,7 @@ $uploadError = (string) ($_GET['upload_error'] ?? '');
     });
   });
 </script>
+<script src="assets/upload.js"></script>
 
 </body>
 </html>

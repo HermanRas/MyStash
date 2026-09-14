@@ -27,9 +27,23 @@ services:
     build: !reset null
     ports: !override
       - "127.0.0.1:8080:8080"
+    container_name: mystash-app
     volumes: !override
       - ./App/Data:/app/Data
-      # Loaded after mystash.ini — conf.d is read in alphabetical order, and
-      # zz sorts last — so these win where the two disagree.
-      - ./App/php.prod.ini:/usr/local/etc/php/conf.d/zz-mystash-prod.ini:ro
+    # Repeated from the base file even though Compose would merge it in,
+    # because this stanza gets copied out of here and out of the README and
+    # run on its own — and a standalone copy that loses it gets Docker's 64M
+    # default, which is smaller than a single video. That is the bug that took
+    # production down: uploads failing with "No space left on device" writing
+    # to /dev/shm while the host had 1.8T free. See docker-compose.yml for the
+    # sizing.
+    shm_size: 4gb
+    # The base file sets MYSTASH_DEV=1, and Compose *merges* environment maps
+    # rather than replacing them — so without this the development flag would
+    # ride straight into production and put PHP's errors back on the page.
+    environment:
+      MYSTASH_DEV: "0"
+    # php.prod.ini is no longer mounted: it is baked into the image and applied
+    # unless MYSTASH_DEV=1, so hardening is what you get by default rather than
+    # something a hand-written compose file can silently omit.
     restart: unless-stopped
