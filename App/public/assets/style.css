@@ -762,15 +762,6 @@ select option {
   background: var(--accent);
 }
 
-.video-card:hover .preview-progress {
-  animation: scrub 3s linear infinite;
-}
-
-@keyframes scrub {
-  from { width: 0%; }
-  to { width: 100%; }
-}
-
 .tile-title {
   margin-top: 8px;
   font-size: 14px;

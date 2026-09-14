@@ -371,12 +371,28 @@ $uploadLimit = min(
     const video = card.querySelector('.thumb-preview');
     if (!video) return;
 
+    const bar = card.querySelector('.preview-progress');
     let timer = null;
+
+    // The bar tracks the clip itself rather than running a fixed animation:
+    // preview length is frames/fps and so varies from under a second to
+    // minutes, and playback only begins after the debounce below.
+    const draw = () => {
+      if (!bar) return;
+      const duration = video.duration;
+      bar.style.width = Number.isFinite(duration) && duration > 0
+        ? `${Math.min(100, (video.currentTime / duration) * 100)}%`
+        : '0%';
+    };
+
+    video.addEventListener('timeupdate', draw);
+    video.addEventListener('seeked', draw);
 
     card.addEventListener('mouseenter', () => {
       timer = setTimeout(() => {
         video.currentTime = 0;
         video.style.display = 'block';
+        draw();
         video.play().catch(() => {});
       }, 180);
     });
@@ -385,6 +401,7 @@ $uploadLimit = min(
       clearTimeout(timer);
       video.pause();
       video.style.display = 'none';
+      if (bar) bar.style.width = '0%';
     });
   });
 </script>
