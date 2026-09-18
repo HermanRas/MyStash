@@ -169,6 +169,58 @@ step(
     $clipDuration > 0 && $clipDuration < $fixtureDuration,
 );
 
+// convertImage() caps the *longest* edge (creator avatars, and VideoPreview's
+// MAX_EDGE). The cap used to be written as `min($maxEdge,iw)`, which only ever
+// constrained the width: a 600x1800 upload came back 512 wide and ~1536 high —
+// over the cap, and not the file size the cap is there to bound. A landscape
+// case passes either way, so all three orientations are here.
+$imageCases = [
+    // label, source size, cap, the edge the cap binds
+    ['a landscape image', '900x300', 128, 'width'],
+    ['a portrait image', '300x900', 128, 'height'],
+    // Already inside the cap: min() leaves it alone rather than upscaling it.
+    ['an image smaller than the cap', '100x80', 128, 'neither'],
+];
+
+foreach ($imageCases as [$label, $size, $cap, $binds]) {
+    [$srcW, $srcH] = array_map('intval', explode('x', $size));
+    $src = $workDir . "/image_{$size}.png";
+    $dst = $workDir . "/image_{$size}_capped.png";
+
+    exec(sprintf(
+        'ffmpeg -v error -y -f lavfi -i color=c=red:s=%s -frames:v 1 %s',
+        escapeshellarg($size),
+        escapeshellarg($src),
+    ));
+
+    step("synthesised a {$size} source image", file_exists($src));
+    step("{$label} converts", $encoder->convertImage($src, $dst, $cap));
+
+    [$outW, $outH] = getimagesize($dst);
+
+    if ($binds === 'neither') {
+        step(
+            sprintf('%s is left at its own size (%dx%d)', $label, $outW, $outH),
+            $outW === $srcW && $outH === $srcH,
+        );
+        continue;
+    }
+
+    step(
+        sprintf('%s fits inside the %d cap on both edges (%dx%d)', $label, $cap, $outW, $outH),
+        $outW <= $cap && $outH <= $cap,
+    );
+    step(
+        sprintf('%s is capped on its %s (%dx%d)', $label, $binds, $outW, $outH),
+        ($binds === 'width' ? $outW : $outH) === $cap,
+    );
+    // -2 rounds the free edge to something even, so allow a pixel of drift.
+    step(
+        sprintf('%s keeps its aspect ratio (%dx%d from %s)', $label, $outW, $outH, $size),
+        abs($outW / $outH - $srcW / $srcH) < 0.05,
+    );
+}
+
 // Derived tags (Docs/SPECIFICATIONS.md §2.3) — pure logic, no ffmpeg needed.
 $qualityCases = [
     [4320, '8K'], [2160, '4K'], [1440, '2K'], [1080, 'Full HD'],

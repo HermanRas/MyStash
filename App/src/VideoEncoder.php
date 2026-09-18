@@ -243,7 +243,14 @@ final class VideoEncoder
             $this->ffmpeg,
             '-y',
             '-i', $inputPath,
-            '-vf', "scale='min({$maxEdge},iw)':-2",
+            // The cap is on the *longest* edge, so which dimension it binds
+            // depends on the image: a portrait upload constrained on its width
+            // came out taller than $maxEdge, which is neither what the docblock
+            // promises nor a predictable file size. `min()` on the bound edge
+            // and -2 on the other leaves an image already under the cap at its
+            // own size rather than upscaling it.
+            '-vf', "scale='if(gt(iw,ih),min({$maxEdge},iw),-2)':"
+                . "'if(gt(iw,ih),-2,min({$maxEdge},ih))'",
             '-frames:v', '1',
             $outputPath,
         ];

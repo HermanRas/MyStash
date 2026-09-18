@@ -13,8 +13,10 @@ $DC exec -T -e NODE_PATH=/opt/pwlib/node_modules playwright node /work/shot_read
 status=$?
 
 if [ "$status" = "0" ]; then
+  # The shots land in a named volume, not in the tree, so they come back out
+  # through the container rather than off the host filesystem.
   mkdir -p Docs/Assets/README
-  cp dev/playwright/screenshots/readme/*.png Docs/Assets/README/
+  $DC cp playwright:/work/screenshots/readme/. Docs/Assets/README/
   echo "copied $(ls Docs/Assets/README/*.png | wc -l) screenshots into Docs/Assets/README"
 fi
 

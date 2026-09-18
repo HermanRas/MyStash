@@ -1,5 +1,7 @@
 App/Data/
-dev/playwright/screenshots/
-dev/playwright/.pwlib/
+# The screenshots live in a Docker named volume now; the directory is kept
+# only because it is the mountpoint, and a read-only bind cannot create it.
+dev/playwright/screenshots/*
+!dev/playwright/screenshots/.gitkeep
 App/tests/fixture.mp4
 dev/sample/

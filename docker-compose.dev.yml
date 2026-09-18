@@ -5,6 +5,20 @@ services:
       - app
     working_dir: /work
     volumes:
-      - ./dev/playwright:/work
-      - ./dev/playwright/.pwlib:/opt/pwlib
+      # The scripts are inputs, not outputs: the container runs the checks, it
+      # does not write into the tree they live in.
+      - ./dev/playwright:/work:ro
+      # The playwright npm package (the image ships the browsers but not the
+      # library — see dev/setup_playwright.sh). A named volume, because this
+      # repository lives in a Google Drive-synced tree and a bind mount here
+      # meant tens of thousands of node_modules files uploaded to Drive and
+      # synced to every other machine. Docker keeps it out of the tree entirely.
+      - playwright-lib:/opt/pwlib
+      # Same reasoning for what the scripts produce. dev/copy_shots.sh lifts
+      # them out when you actually want to look at them.
+      - playwright-shots:/work/screenshots
     entrypoint: ["tail", "-f", "/dev/null"]
+
+volumes:
+  playwright-lib:
+  playwright-shots:
