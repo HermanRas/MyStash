@@ -14,6 +14,7 @@ require_once __DIR__ . '/../src/LoginThrottle.php';
 require_once __DIR__ . '/../src/VideoIngest.php';
 require_once __DIR__ . '/../src/VideoPreview.php';
 require_once __DIR__ . '/../src/Playlists.php';
+require_once __DIR__ . '/../src/VideoStats.php';
 
 use MyStash\CreatorQuery;
 use MyStash\Datastore;
@@ -29,6 +30,7 @@ use MyStash\VideoQuality;
 use MyStash\LoginThrottle;
 use MyStash\Playlists;
 use MyStash\VideoQuery;
+use MyStash\VideoStats;
 
 function step(string $label, bool $ok): void
 {
@@ -1158,5 +1160,26 @@ $norm = Playlists::all($ragged)[0];
 step('a playlist record missing its fields is filled in, not fatal',
     $norm['videos'] === [] && $norm['name'] === 'Ragged' && $norm['id'] === '0');
 
+
+// --- Stats: the reduce rules ---------------------------------------------
+step('2560x1440 is over Full HD', VideoStats::exceedsFullHd(2560, 1440));
+step('1920x1080 is not over Full HD', !VideoStats::exceedsFullHd(1920, 1080));
+// A phone clip held upright is at Full HD, turned on its side — not over it.
+step('portrait 1080x1920 is not over Full HD', !VideoStats::exceedsFullHd(1080, 1920));
+step('portrait 1440x2560 is over Full HD', VideoStats::exceedsFullHd(1440, 2560));
+step('an unmeasured size is never over', !VideoStats::exceedsFullHd(null, null));
+step('60fps is over 30', VideoStats::exceedsTargetFps(60.0));
+// NTSC: re-encoding 29.97 "down" to 30 would be a full transcode for nothing.
+step('29.97fps and 30fps are not over', !VideoStats::exceedsTargetFps(29.97) && !VideoStats::exceedsTargetFps(30.0));
+step('the landscape filter fits the 1920x1080 box',
+    VideoStats::filterFor(true, true, 3840, 2160)
+        === 'fps=30,scale=1920:1080:force_original_aspect_ratio=decrease:force_divisible_by=2');
+step('the portrait filter turns the box upright',
+    VideoStats::filterFor(false, true, 2160, 3840)
+        === 'scale=1080:1920:force_original_aspect_ratio=decrease:force_divisible_by=2');
+step('no options means no filter', VideoStats::filterFor(false, false, 3840, 2160) === null);
+step('byte counts read as people say them',
+    VideoStats::formatBytes(512) === '512 B' && VideoStats::formatBytes(1536) === '1.5 KB'
+        && VideoStats::formatBytes(812 * 1024 * 1024) === '812 MB');
 
 echo PHP_EOL . "All smoke tests passed." . PHP_EOL;

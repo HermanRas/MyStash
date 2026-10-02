@@ -22,6 +22,7 @@ require_once __DIR__ . '/../src/Rekey.php';
 require_once __DIR__ . '/../src/VideoCategories.php';
 require_once __DIR__ . '/../src/VideoEncoder.php';
 require_once __DIR__ . '/../src/VideoQuality.php';
+require_once __DIR__ . '/../src/VideoStats.php';
 
 use MyStash\Crypto7z;
 use MyStash\Datastore;
@@ -30,6 +31,7 @@ use MyStash\Rekey;
 use MyStash\VideoCategories;
 use MyStash\VideoEncoder;
 use MyStash\VideoQuality;
+use MyStash\VideoStats;
 
 $id = (string) ($argv[1] ?? '');
 
@@ -83,6 +85,13 @@ exit(0);
  * per-video metadata → index, so an interruption leaves an index that still
  * describes what is on disk.
  *
+ * The same job also carries the Stats screen's reductions (30fps, 1920×1080).
+ * They are a convert with a -vf chain, not a job kind of their own, on
+ * purpose: the job id is the guard against two ffmpeg runs replacing the same
+ * archive, and a separate kind would get a separate id and could run beside a
+ * plain convert of the same video. The choice rides in the public record as
+ * `reduce_fps`/`reduce_scale` with the inspected size it was made against.
+ *
  * @param array<string, mixed> $record
  * @param array<string, string> $secrets
  */
@@ -123,7 +132,17 @@ function runConvert(string $id, array $record, array $secrets): void
             return;
         }
 
-        Jobs::update($id, ['message' => 'Converting to MP4/H.265…']);
+        $reduceFps = !empty($record['reduce_fps']);
+        $reduceScale = !empty($record['reduce_scale']);
+        $filter = VideoStats::filterFor(
+            $reduceFps,
+            $reduceScale,
+            isset($record['width']) ? (int) $record['width'] : null,
+            isset($record['height']) ? (int) $record['height'] : null,
+        );
+        $label = $filter !== null ? VideoStats::describe($reduceFps, $reduceScale) : 'Converting to MP4/H.265';
+
+        Jobs::update($id, ['message' => "{$label}…"]);
 
         $convertedPath = "{$workDir}/{$videoId}.mp4";
 
@@ -138,7 +157,7 @@ function runConvert(string $id, array $record, array $secrets): void
             ]);
         };
 
-        if (!$encoder->convertToMp4Hevc($originalPath, $convertedPath, $onProgress)) {
+        if (!$encoder->convertToMp4Hevc($originalPath, $convertedPath, $onProgress, videoFilter: $filter)) {
             // Either ffmpeg failed or it stopped making progress and was
             // killed. Either way nothing has touched the stash yet.
             Jobs::finish($id, false, 'The conversion failed or stalled. The original video is untouched.');
@@ -159,8 +178,17 @@ function runConvert(string $id, array $record, array $secrets): void
         }
 
         // The converted file is still decrypted in tmpfs here, so this is the
-        // one moment the real pixel height is cheap to read.
-        $height = $encoder->videoHeight($convertedPath);
+        // one moment its real size and frame rate are cheap to read — and
+        // after a reduction the Stats screen should show what it now is, not
+        // what it was.
+        $probe = $encoder->probe($convertedPath);
+        $height = $probe['height'] ?? $encoder->videoHeight($convertedPath);
+        $measured = [
+            'height' => $height,
+            'width' => $probe['width'] ?? null,
+            'fps' => $probe['fps'] ?? null,
+            'inspected_at' => time(),
+        ];
 
         $datastore = new Datastore();
         $index = $datastore->loadIndex($user, $password);
@@ -175,10 +203,12 @@ function runConvert(string $id, array $record, array $secrets): void
 
         foreach ($index['videos'] as &$video) {
             if ($video['id'] === $videoId) {
-                $video['format'] = 'mp4';
-                $video['codec'] = 'hevc';
-                $video['height'] = $height;
-                $video = VideoQuality::apply($video);
+                $video = VideoQuality::apply([
+                    ...$video,
+                    ...$measured,
+                    'format' => 'mp4',
+                    'codec' => 'hevc',
+                ]);
                 break;
             }
         }
@@ -199,9 +229,9 @@ function runConvert(string $id, array $record, array $secrets): void
         if ($metadata !== null) {
             $datastore->saveVideoMetadata($user, $password, $videoId, VideoQuality::apply([
                 ...$metadata,
+                ...$measured,
                 'format' => 'mp4',
                 'codec' => 'hevc',
-                'height' => $height,
             ]));
         }
 
@@ -212,7 +242,9 @@ function runConvert(string $id, array $record, array $secrets): void
             return;
         }
 
-        Jobs::finish($id, true, 'Converted to MP4/H.265.');
+        Jobs::finish($id, true, $filter !== null
+            ? sprintf('Reduced to %s, %sfps.', ($measured['width'] ?? '?') . '×' . ($height ?? '?'), $measured['fps'] ?? '?')
+            : 'Converted to MP4/H.265.');
     } finally {
         Datastore::wipe($workDir);
     }

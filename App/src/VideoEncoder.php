@@ -86,6 +86,72 @@ final class VideoEncoder
     }
 
     /**
+     * Frame rate and pixel size of the first video stream, for the Stats
+     * screen's Inspect button.
+     *
+     * The frame rate is avg_frame_rate — what the file actually plays at —
+     * falling back to r_frame_rate, which for variable-rate phone footage can
+     * claim 90000/1 or similar and is only a last resort. Width and height are
+     * as displayed: a phone clip stored landscape with a 90° rotation tag is
+     * reported portrait, because that is the box the viewer sees.
+     *
+     * @return array{fps: ?float, width: ?int, height: ?int, codec: ?string}|null
+     */
+    public function probe(string $inputPath): ?array
+    {
+        [$exitCode, $stdout] = $this->run([
+            $this->ffprobe,
+            '-v', 'error',
+            '-select_streams', 'v:0',
+            '-show_entries', 'stream=codec_name,width,height,avg_frame_rate,r_frame_rate:stream_side_data=rotation:stream_tags=rotate',
+            '-of', 'json',
+            $inputPath,
+        ]);
+
+        $stream = $exitCode === 0 ? (json_decode($stdout, true)['streams'][0] ?? null) : null;
+
+        if (!is_array($stream)) {
+            return null;
+        }
+
+        $fps = self::rate((string) ($stream['avg_frame_rate'] ?? ''))
+            ?? self::rate((string) ($stream['r_frame_rate'] ?? ''));
+
+        $width = isset($stream['width']) ? (int) $stream['width'] : null;
+        $height = isset($stream['height']) ? (int) $stream['height'] : null;
+
+        $rotation = (int) ($stream['tags']['rotate'] ?? 0);
+        foreach ($stream['side_data_list'] ?? [] as $side) {
+            if (isset($side['rotation'])) {
+                $rotation = (int) $side['rotation'];
+            }
+        }
+
+        if (abs($rotation) % 180 === 90) {
+            [$width, $height] = [$height, $width];
+        }
+
+        return [
+            'fps' => $fps !== null ? round($fps, 3) : null,
+            'width' => $width,
+            'height' => $height,
+            'codec' => isset($stream['codec_name']) ? (string) $stream['codec_name'] : null,
+        ];
+    }
+
+    /**
+     * "30000/1001" → 29.97. Null for ffprobe's "0/0" (unknown).
+     */
+    private static function rate(string $fraction): ?float
+    {
+        if (!preg_match('#^(\d+)/(\d+)$#', $fraction, $m) || (int) $m[2] === 0 || (int) $m[1] === 0) {
+            return null;
+        }
+
+        return (int) $m[1] / (int) $m[2];
+    }
+
+    /**
      * Converts $inputPath to MP4/H.265 at $outputPath.
      *
      * With no $onProgress this is the plain blocking call it always was. Give
@@ -100,6 +166,10 @@ final class VideoEncoder
      * never normal is ffmpeg sitting at the same timestamp for minutes, so
      * that is what gets killed. $ceilingSeconds is only a last backstop.
      *
+     * $videoFilter is an optional -vf chain (the Stats screen's 30fps and
+     * 1920×1080 reductions, see VideoStats::filterFor()). Null converts the
+     * video exactly as before.
+     *
      * @param callable(float, float):void|null $onProgress (secondsDone, secondsTotal)
      */
     public function convertToMp4Hevc(
@@ -108,6 +178,7 @@ final class VideoEncoder
         ?callable $onProgress = null,
         int $stallSeconds = 180,
         int $ceilingSeconds = 21600,
+        ?string $videoFilter = null,
     ): bool {
         $command = [
             $this->ffmpeg,
@@ -116,6 +187,7 @@ final class VideoEncoder
             // to read the console for its interactive keys.
             '-nostdin',
             '-i', $inputPath,
+            ...($videoFilter !== null ? ['-vf', $videoFilter] : []),
             '-c:v', 'libx265',
             '-c:a', 'aac',
             $outputPath,

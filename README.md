@@ -197,6 +197,13 @@ Conversion runs in the background with a progress bar the page polls. Leave the
 page, keep browsing, or close the tab — it carries on, and the original stays
 exactly as it is until the converted copy has been written and verified.
 
+### Stats
+
+**Stats** in the user menu lists every video by its size on disk, largest
+first. **Inspect** reads a video's frame rate and pixel size. Anything over
+30fps or 1920×1080 is then offered a **Reduce**, which re-encodes it with
+ffmpeg in the background exactly the way a conversion does.
+
 ### Creators
 
 ![Creators](Docs/Assets/README/14_creators.png)
@@ -294,7 +301,7 @@ across the site and fails if any of them leaves this origin.
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
-docker compose exec app php /app/tests/smoke_test.php     # 227 checks
+docker compose exec app php /app/tests/smoke_test.php     # 251 checks
 ```
 
 The `dev/` scripts each prove one property against real HTTP endpoints and, for
@@ -311,6 +318,7 @@ the parts curl cannot reach, a real browser in a Playwright container:
 | `run_preview_check.sh` | re-previewing from a timestamp and from an upload |
 | `run_delete_check.sh` | deleting videos, creators and whole stashes |
 | `run_convert_check.sh` | converting a video, as a detached background job |
+| `run_stats_check.sh` | the Stats screen: sizes, Inspect, and a 30fps / 1920×1080 reduction |
 | `run_layout_check.sh` | the management screens share the watch page's column |
 | `run_font_check.sh` | nothing on the site is fetched from another host |
 

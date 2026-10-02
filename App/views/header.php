@@ -107,6 +107,7 @@ $navPills = [
         <a href="playlist.php"><img class="menu-icon" src="assets/img/icons/playlist.png" alt="">Playlists</a>
         <a href="category.php"><img class="menu-icon" src="assets/img/icons/tag.png" alt="">Manage Categories</a>
         <a href="user.php"><img class="menu-icon" src="assets/img/icons/user.png" alt="">Profile &amp; Password</a>
+        <a href="stats.php"><img class="menu-icon" src="assets/img/icons/sort-90.png" alt="">Stats</a>
         <a href="logout.php"><img class="menu-icon" src="assets/img/icons/logout.png" alt="">Log Out</a>
       </div>
     </div>
