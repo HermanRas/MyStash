@@ -108,7 +108,11 @@ $navActive = 'videos';
       <div class="card job-card indeterminate" id="job-card"
            data-kind="convert" data-target="<?= htmlspecialchars($id, ENT_QUOTES) ?>">
         <div class="section-title" style="margin-top:0;">
-          <?= !empty($convertJob['reduce_fps']) || !empty($convertJob['reduce_scale']) ? 'Reducing video' : 'Converting to MP4/H.265' ?>
+          <?= match (true) {
+              !empty($convertJob['trim_mode']) => 'Trimming video',
+              !empty($convertJob['reduce_fps']) || !empty($convertJob['reduce_scale']) => 'Reducing video',
+              default => 'Converting to MP4/H.265',
+          } ?>
         </div>
         <div class="progress"><div class="progress-bar" id="job-bar"></div></div>
         <p class="hint job-message" id="job-message">

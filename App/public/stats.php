@@ -5,11 +5,13 @@ declare(strict_types=1);
 require_once __DIR__ . '/../src/Session.php';
 require_once __DIR__ . '/../src/Jobs.php';
 require_once __DIR__ . '/../src/VideoStats.php';
+require_once __DIR__ . '/../src/VideoTrim.php';
 require_once __DIR__ . '/../views/format.php';
 
 use MyStash\Jobs;
 use MyStash\Session;
 use MyStash\VideoStats;
+use MyStash\VideoTrim;
 
 /**
  * Stats: what each video costs on disk, largest first, with an Inspect button
@@ -18,7 +20,10 @@ use MyStash\VideoStats;
  *
  * Sizes are read off the filesystem on every load rather than stored: they are
  * a stat() per file, and a stored number would go stale the first time a
- * conversion or a new preview changed it. Frame rate and pixel size cost a full
+ * conversion or a new preview changed it.
+ *
+ * Trim opens trim.php. Once a trim has made its copy, the row offers that copy
+ * instead — play, keep or delete — and no second Trim until it is settled. Frame rate and pixel size cost a full
  * decrypt to learn, so those *are* stored, by video_inspect.php and by every
  * conversion, and shown from the index.
  */
@@ -62,6 +67,7 @@ foreach ($index['videos'] ?? [] as $video) {
         'over_fps' => VideoStats::exceedsTargetFps($fps),
         'over_size' => VideoStats::exceedsFullHd($width, $height),
         'running' => $running,
+        'trimmed' => VideoTrim::exists($user, $id),
         'failed' => $job !== null && $job['state'] === Jobs::FAILED ? (string) $job['message'] : '',
     ];
 }
@@ -70,6 +76,8 @@ foreach ($index['videos'] ?? [] as $video) {
 usort($rows, static fn(array $a, array $b) => [$b['bytes'], $a['title']] <=> [$a['bytes'], $b['title']]);
 
 $inspected = (string) ($_GET['inspected'] ?? '');
+$trimNotice = (string) ($_GET['trim'] ?? '');
+$trimError = (string) ($_GET['trim_error'] ?? '');
 $error = (string) ($_GET['error'] ?? '');
 
 $errors = [
@@ -98,6 +106,12 @@ $navActive = '';
 
   <?php if (isset($errors[$error])): ?>
     <p class="notice bad"><?= htmlspecialchars($errors[$error], ENT_QUOTES) ?></p>
+  <?php endif; ?>
+
+  <?php if ($trimError !== ''): ?>
+    <p class="notice bad"><?= htmlspecialchars($trimError, ENT_QUOTES) ?></p>
+  <?php elseif ($trimNotice !== ''): ?>
+    <p class="notice ok"><?= htmlspecialchars($trimNotice, ENT_QUOTES) ?></p>
   <?php endif; ?>
 
   <?php if ($runningJob !== null): ?>
@@ -170,6 +184,24 @@ $navActive = '';
                 <div class="stats-actions">
                 <?php if ($row['running']): ?>
                   <span class="hint">Working…</span>
+                <?php elseif ($row['trimmed']): ?>
+                  <?php /* A trimmed copy is waiting on a decision. Nothing else
+                           is offered until it gets one: a Reduce or a second
+                           trim now would be working on a video that is about
+                           to be replaced, or not. */ ?>
+                  <span class="hint">Trimmed copy ready</span>
+                  <a class="btn small" href="trim.php?id=<?= urlencode($row['id']) ?>">Play</a>
+                  <form action="video_trim.php" method="post" class="stats-inspect"
+                        onsubmit="return confirm('Replace the video with the trimmed copy?\n\nThe trimmed-off part is gone for good once you do.');">
+                    <input type="hidden" name="id" value="<?= $rowId ?>">
+                    <input type="hidden" name="action" value="keep">
+                    <button type="submit" class="btn secondary small">Keep</button>
+                  </form>
+                  <form action="video_trim.php" method="post" class="stats-inspect">
+                    <input type="hidden" name="id" value="<?= $rowId ?>">
+                    <input type="hidden" name="action" value="delete">
+                    <button type="submit" class="btn secondary small">Delete</button>
+                  </form>
                 <?php else: ?>
                   <?php if ($row['inspected'] && ($row['over_fps'] || $row['over_size'])): ?>
                     <form action="video_reduce.php" method="post" class="stats-reduce"
@@ -191,6 +223,7 @@ $navActive = '';
                     <input type="hidden" name="id" value="<?= $rowId ?>">
                     <button type="submit" class="btn secondary small"><?= $row['inspected'] ? 'Inspect again' : 'Inspect' ?></button>
                   </form>
+                  <a class="btn secondary small" href="trim.php?id=<?= urlencode($row['id']) ?>">Trim</a>
                 <?php endif; ?>
                 </div>
               </td>

@@ -24,6 +24,7 @@ require_once __DIR__ . '/../src/VideoEncoder.php';
 require_once __DIR__ . '/../src/VideoPreview.php';
 require_once __DIR__ . '/../src/VideoQuality.php';
 require_once __DIR__ . '/../src/VideoStats.php';
+require_once __DIR__ . '/../src/VideoTrim.php';
 
 use MyStash\Crypto7z;
 use MyStash\Datastore;
@@ -34,6 +35,7 @@ use MyStash\VideoEncoder;
 use MyStash\VideoPreview;
 use MyStash\VideoQuality;
 use MyStash\VideoStats;
+use MyStash\VideoTrim;
 
 $id = (string) ($argv[1] ?? '');
 
@@ -66,7 +68,11 @@ Jobs::update($id, ['pid' => getmypid()]);
 
 try {
     match ((string) $record['kind']) {
-        'convert' => runConvert($id, $record, $secrets),
+        // A trim shares the convert job's id for the same reason a reduction
+        // does: one ffmpeg per video at a time. See runTrim().
+        'convert' => !empty($record['trim_mode'])
+            ? runTrim($id, $record, $secrets)
+            : runConvert($id, $record, $secrets),
         'rekey' => runRekey($id, $record, $secrets),
         'preview' => runPreview($id, $record, $secrets),
         default => Jobs::finish($id, false, 'Unknown job type.'),
@@ -186,11 +192,13 @@ function runConvert(string $id, array $record, array $secrets): void
         // what it was.
         $probe = $encoder->probe($convertedPath);
         $height = $probe['height'] ?? $encoder->videoHeight($convertedPath);
+        $seconds = $encoder->durationSeconds($convertedPath);
         $measured = [
             'height' => $height,
             'width' => $probe['width'] ?? null,
             'fps' => $probe['fps'] ?? null,
             'inspected_at' => time(),
+            ...($seconds !== null ? ['duration_ms' => (int) floor($seconds * 1000)] : []),
         ];
 
         $datastore = new Datastore();
@@ -254,7 +262,9 @@ function runConvert(string $id, array $record, array $secrets): void
 }
 
 /**
- * Build one video's hover clip after it has been uploaded.
+ * Build one video's hover clip after it has been uploaded, or after a trim
+ * was kept — which also passes `frame_at` when the thumbnail was taken from
+ * the part the trim removed, so it is retaken in the same pass.
  *
  * Split out of the upload request because it decodes the whole video, which on
  * a long one kept that request open past the reverse proxy's timeout. The
@@ -271,10 +281,51 @@ function runPreview(string $id, array $record, array $secrets): void
         (string) $secrets['password'],
         (string) $record['target'],
         static fn(string $stage) => Jobs::update($id, ['message' => $stage]),
+        isset($record['frame_at']) ? (float) $record['frame_at'] : null,
     );
 
     if (!$result['ok']) {
         error_log("MyStash preview {$record['target']} for {$record['user']}: {$result['message']}");
+    }
+
+    Jobs::finish($id, $result['ok'], $result['message']);
+}
+
+/**
+ * Make a trimmed copy of one video beside it, `{ID}_trim.mp4.enc`.
+ *
+ * A convert job carrying `trim_mode`, `trim_from_ms` and `trim_to_ms` in its
+ * public record. The video itself is only read: VideoTrim::make() writes the
+ * copy, and the user keeps or deletes it from Video Stats afterwards.
+ *
+ * @param array<string, mixed> $record
+ * @param array<string, string> $secrets
+ */
+function runTrim(string $id, array $record, array $secrets): void
+{
+    $spec = VideoTrim::spec(
+        (string) $record['trim_mode'],
+        (int) ($record['trim_from_ms'] ?? 0),
+        isset($record['trim_to_ms']) ? (int) $record['trim_to_ms'] : null,
+    );
+
+    $result = (new VideoTrim())->make(
+        (string) $record['user'],
+        (string) $secrets['password'],
+        (string) $record['target'],
+        $spec,
+        static function (float $done, float $total) use ($id): void {
+            Jobs::update($id, [
+                'done' => (int) round($done),
+                'total' => (int) round($total),
+                'percent' => $total > 0 ? min(99, (int) round($done / $total * 100)) : 0,
+            ]);
+        },
+        static fn(string $stage) => Jobs::update($id, ['message' => $stage]),
+    );
+
+    if (!$result['ok']) {
+        error_log("MyStash trim {$record['target']} for {$record['user']}: {$result['message']}");
     }
 
     Jobs::finish($id, $result['ok'], $result['message']);

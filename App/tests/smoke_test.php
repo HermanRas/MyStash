@@ -15,6 +15,8 @@ require_once __DIR__ . '/../src/VideoIngest.php';
 require_once __DIR__ . '/../src/VideoPreview.php';
 require_once __DIR__ . '/../src/Playlists.php';
 require_once __DIR__ . '/../src/VideoStats.php';
+require_once __DIR__ . '/../src/VideoTrim.php';
+require_once __DIR__ . '/../src/VideoCategories.php';
 
 use MyStash\CreatorQuery;
 use MyStash\Datastore;
@@ -31,6 +33,8 @@ use MyStash\LoginThrottle;
 use MyStash\Playlists;
 use MyStash\VideoQuery;
 use MyStash\VideoStats;
+use MyStash\VideoTrim;
+use MyStash\VideoCategories;
 
 function step(string $label, bool $ok): void
 {
@@ -927,6 +931,133 @@ step('no .old or .new copies left behind', $litter === []);
 
 Datastore::wipe(Datastore::userDir($previewUser));
 step('cleaned up', !is_dir(Datastore::userDir($previewUser)));
+
+// -------------------------------------------------------------------------
+echo PHP_EOL . "-- trimming a video (Video Stats) --" . PHP_EOL;
+// -------------------------------------------------------------------------
+//
+// A trim writes a second archive beside the video and never touches the video
+// until the user keeps it. The ranges are the part to *remove*.
+
+// --- the rules, before any ffmpeg ---
+$v = static fn(string $mode, int $from, ?int $to, ?int $length = 20000): ?string
+    => VideoTrim::validate(VideoTrim::spec($mode, $from, $to), $length);
+
+step('Start 0–5000ms of a 20s video is fine', $v('start', 0, 5000) === null);
+step('Start to 0ms is refused', $v('start', 0, 0) !== null);
+step('Start past the end is refused', $v('start', 0, 20000) !== null);
+step('End from 15000ms is fine', $v('end', 15000, null) === null);
+step('End from 0ms (the whole video) is refused', $v('end', 0, null) !== null);
+step('Cut 5000–10000ms is fine', $v('cut', 5000, 10000) === null);
+step('a Cut from 0ms is refused, pointing at Start (' . $v('cut', 0, 4000) . ')', $v('cut', 0, 4000) !== null);
+step('a Cut past the end is refused', $v('cut', 5000, 20000) !== null);
+step('a Cut that ends before it starts is refused', $v('cut', 9000, 8000) !== null);
+step('an unknown length leaves the upper bound to the worker', $v('cut', 5000, 999999, null) === null);
+step('lengths read as the form shows them (723029 → 12m3s29ms)', VideoTrim::formatMs(723029) === '12m3s29ms');
+
+$cut = VideoTrim::spec('cut', 5000, 10000);
+step('a point before a cut stays put', VideoTrim::mapSeconds(3.0, $cut) === 3.0);
+step('a point inside a cut moves to its edge', VideoTrim::mapSeconds(7.0, $cut) === 5.0);
+step('a point after a cut moves back by its length', VideoTrim::mapSeconds(12.0, $cut) === 7.0);
+
+// --- the real thing, on a throwaway stash ---
+$trimUser = 'TrimProbe' . bin2hex(random_bytes(3));
+$trimKey = 'trim-probe-password-aaaaaaaaaa';
+step("create a throwaway stash ({$trimUser})", (new User())->create($trimUser, $trimKey));
+
+$trimIndex = $store->loadIndex($trimUser, $trimKey);
+$trimEntry = (new VideoIngest())->ingest($trimUser, $trimKey, $fixture, 'trim-probe.mp4', $trimIndex, 12.0);
+$trimIndex['videos'][] = $trimEntry;
+$store->saveIndex($trimUser, $trimKey, $trimIndex);
+$trimId = (string) $trimEntry['id'];
+step('ingest records the length to the millisecond (' . $trimEntry['duration_ms'] . 'ms)',
+    abs($trimEntry['duration_ms'] - 20000) < 100);
+
+// A category at 12s, inside the cut-to-be's far side, to watch it move.
+$trimIndex = $store->loadIndex($trimUser, $trimKey);
+(new VideoCategories())->save($trimUser, $trimKey, $trimId,
+    [['name' => 'Probe', 'timestamp_seconds' => 12]], $trimIndex);
+$store->saveIndex($trimUser, $trimKey, $trimIndex);
+
+$videoArchive = Datastore::videoDir($trimUser, $trimId) . "/{$trimId}.mp4.enc";
+$videoHash = hash_file('sha256', $videoArchive);
+$trimmer = new VideoTrim();
+$encoder = new VideoEncoder();
+
+$trimmedLength = static function () use ($trimUser, $trimKey, $trimId, $encoder): float {
+    $out = Datastore::tmpfsWorkDir('smoketrim');
+    (new Crypto7z())->extract(VideoTrim::archivePath($trimUser, $trimId), $out, $trimKey);
+    $length = $encoder->durationSeconds(glob("{$out}/*")[0] ?? '') ?? 0.0;
+    Datastore::wipe($out);
+
+    return $length;
+};
+
+foreach ([['start', 0, 5000], ['end', 15000, null], ['cut', 5000, 10000]] as [$mode, $from, $to]) {
+    $made = $trimmer->make($trimUser, $trimKey, $trimId, VideoTrim::spec($mode, $from, $to));
+    $length = $made['ok'] ? $trimmedLength() : 0.0;
+    step(sprintf('%s trim makes a 15s copy (%s, got %.2fs)', ucfirst($mode), $made['message'], $length),
+        $made['ok'] && abs($length - 15.0) < 0.2);
+    step('...and leaves the video byte-for-byte alone', hash_file('sha256', $videoArchive) === $videoHash);
+
+    if ($mode !== 'cut') {
+        $trimmer->discard($trimUser, $trimKey, $trimId);
+    }
+}
+
+$again = $trimmer->make($trimUser, $trimKey, $trimId, VideoTrim::spec('start', 0, 1000));
+step('a second trim is refused while a copy is waiting', $again['ok'] === false);
+
+$trimmer->discard($trimUser, $trimKey, $trimId);
+$late = $trimmer->make($trimUser, $trimKey, $trimId, VideoTrim::spec('cut', 5000, 25000));
+step('the worker refuses a cut past the real end (' . $late['message'] . ')',
+    $late['ok'] === false && !VideoTrim::exists($trimUser, $trimId));
+
+$discarded = $trimmer->discard($trimUser, $trimKey, $trimId);
+step('Delete removes the copy and leaves no trim record',
+    $discarded['ok'] && !VideoTrim::exists($trimUser, $trimId)
+    && !isset($store->loadVideoMetadata($trimUser, $trimKey, $trimId)['trim']));
+
+// --- Keep a cut of 5–10s: the video becomes the 15s copy ---
+$trimmer->make($trimUser, $trimKey, $trimId, VideoTrim::spec('cut', 5000, 10000));
+$kept = $trimmer->keep($trimUser, $trimKey, $trimId);
+$keptMeta = $store->loadVideoMetadata($trimUser, $trimKey, $trimId);
+$keptEntry = array_values(array_filter(
+    $store->loadIndex($trimUser, $trimKey)['videos'],
+    static fn($video) => $video['id'] === $trimId,
+))[0] ?? [];
+
+step('Keep swaps the trimmed copy in (' . $kept['message'] . ')',
+    $kept['ok'] && !VideoTrim::exists($trimUser, $trimId) && hash_file('sha256', $videoArchive) !== $videoHash);
+step('...the index has the new length', ($keptEntry['length_seconds'] ?? 0) === 15
+    && abs(($keptEntry['duration_ms'] ?? 0) - 15000) < 200);
+step('...the category at 12s moved to 7s', ($keptMeta['categories'][0]['timestamp_seconds'] ?? null) === 7);
+step('...the preview capture at 12s moved to 7s', (int) round((float) $keptMeta['preview_capture_seconds']) === 7);
+step('...it was not taken from the cut, so no retake is asked for', $kept['frame_at'] === null);
+step('...and the trim record is gone', !isset($keptMeta['trim']));
+
+// A thumbnail from inside the removed part is retaken where that point lands.
+$trimmer->make($trimUser, $trimKey, $trimId, VideoTrim::spec('start', 0, 9000));
+$retake = $trimmer->keep($trimUser, $trimKey, $trimId);
+step('a thumbnail from the trimmed-off part asks for a retake at 0s', $retake['frame_at'] === 0.0);
+$clip = (new VideoPreview())->buildClip($trimUser, $trimKey, $trimId, null, $retake['frame_at']);
+step('...which the preview job does along with the clip', $clip['ok']
+    && (float) $store->loadVideoMetadata($trimUser, $trimKey, $trimId)['preview_capture_seconds'] === 0.0);
+
+// --- a video with no sound: the graph must not name [0:a] ---
+$silentDir = Datastore::tmpfsWorkDir('smoketrim');
+$silent = "{$silentDir}/silent.mp4";
+exec(sprintf('ffmpeg -v error -y -f lavfi -i testsrc=size=320x180:rate=25:duration=6 -pix_fmt yuv420p %s', escapeshellarg($silent)));
+step('a silent test video exists', is_file($silent) && !$encoder->hasAudio($silent));
+$silentOut = "{$silentDir}/silent_trim.mp4";
+step('a cut out of a silent video encodes',
+    $encoder->convertToMp4Hevc($silent, $silentOut,
+        filterGraph: VideoTrim::filterGraph(VideoTrim::spec('cut', 2000, 4000), false))
+    && abs(($encoder->durationSeconds($silentOut) ?? 0) - 4.0) < 0.2);
+Datastore::wipe($silentDir);
+
+Datastore::wipe(Datastore::userDir($trimUser));
+step('cleaned up', !is_dir(Datastore::userDir($trimUser)));
 
 // -------------------------------------------------------------------------
 echo PHP_EOL . "-- hostile input at the command boundary (7.2) --" . PHP_EOL;

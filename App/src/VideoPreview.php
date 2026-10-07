@@ -136,10 +136,18 @@ final class VideoPreview
      *
      * @param callable(string): void|null $onStage told what is happening, for
      *        the job record
+     * @param float|null $frameAt also retake the thumbnail at this point —
+     *        after a kept trim removed the moment it was taken from. The video
+     *        is decrypted here anyway, so it costs one frame grab.
      * @return array{ok: bool, message: string}
      */
-    public function buildClip(string $user, string $password, string $id, ?callable $onStage = null): array
-    {
+    public function buildClip(
+        string $user,
+        string $password,
+        string $id,
+        ?callable $onStage = null,
+        ?float $frameAt = null,
+    ): array {
         $videoDir = Datastore::videoDir($user, $id);
         $videoArchive = "{$videoDir}/{$id}.mp4.enc";
 
@@ -162,6 +170,17 @@ final class VideoPreview
 
             if ($video === null) {
                 return ['ok' => false, 'message' => 'The video could not be opened.'];
+            }
+
+            // Not fatal: the old thumbnail is still a picture, just of a moment
+            // the video no longer has.
+            if ($frameAt !== null) {
+                $framePath = "{$workDir}/preview.jpg";
+
+                if (!$this->encoder->extractFrame($video, $framePath, $frameAt)
+                    || $this->store($user, $password, $id, $framePath, $frameAt)['ok'] !== true) {
+                    error_log("MyStash preview: could not retake the thumbnail of {$id} at {$frameAt}s");
+                }
             }
 
             $onStage && $onStage('Building the hover preview…');

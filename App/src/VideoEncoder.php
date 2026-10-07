@@ -65,6 +65,24 @@ final class VideoEncoder
         return (float) trim($stdout);
     }
 
+    /**
+     * Whether the file has an audio stream at all. A filter graph that names
+     * [0:a] fails outright on a silent video, so Trim has to know.
+     */
+    public function hasAudio(string $inputPath): bool
+    {
+        [$exitCode, $stdout] = $this->run([
+            $this->ffprobe,
+            '-v', 'error',
+            '-select_streams', 'a',
+            '-show_entries', 'stream=index',
+            '-of', 'csv=p=0',
+            $inputPath,
+        ]);
+
+        return $exitCode === 0 && trim($stdout) !== '';
+    }
+
     public function videoHeight(string $inputPath): ?int
     {
         $command = [
@@ -170,7 +188,13 @@ final class VideoEncoder
      * 1920×1080 reductions, see VideoStats::filterFor()). Null converts the
      * video exactly as before.
      *
+     * $filterGraph is the alternative for work one -vf chain cannot express:
+     * a -filter_complex graph and the labelled outputs to -map (Trim, see
+     * VideoTrim::filterGraph()). Its output is shorter than the input, so
+     * $outputSeconds says how long it will be, or the bar would stop short.
+     *
      * @param callable(float, float):void|null $onProgress (secondsDone, secondsTotal)
+     * @param array{graph: string, maps: list<string>}|null $filterGraph
      */
     public function convertToMp4Hevc(
         string $inputPath,
@@ -179,7 +203,14 @@ final class VideoEncoder
         int $stallSeconds = 180,
         int $ceilingSeconds = 21600,
         ?string $videoFilter = null,
+        ?array $filterGraph = null,
+        ?float $outputSeconds = null,
     ): bool {
+        $maps = [];
+        foreach ($filterGraph['maps'] ?? [] as $label) {
+            array_push($maps, '-map', $label);
+        }
+
         $command = [
             $this->ffmpeg,
             '-y',
@@ -188,6 +219,7 @@ final class VideoEncoder
             '-nostdin',
             '-i', $inputPath,
             ...($videoFilter !== null ? ['-vf', $videoFilter] : []),
+            ...($filterGraph !== null ? ['-filter_complex', $filterGraph['graph'], ...$maps] : []),
             '-c:v', 'libx265',
             '-c:a', 'aac',
             $outputPath,
@@ -200,7 +232,7 @@ final class VideoEncoder
         // Known up front, so progress can be a percentage rather than a
         // spinner. 0.0 if ffprobe cannot say, and the caller renders
         // indeterminate rather than dividing by it.
-        $total = $this->durationSeconds($inputPath) ?? 0.0;
+        $total = $outputSeconds ?? $this->durationSeconds($inputPath) ?? 0.0;
 
         array_splice($command, -1, 0, ['-progress', 'pipe:1', '-nostats', '-loglevel', 'error']);
 

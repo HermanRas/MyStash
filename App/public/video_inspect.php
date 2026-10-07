@@ -67,13 +67,16 @@ session_write_close();
 $archivePath = Datastore::videoDir($user, $id) . "/{$id}.mp4.enc";
 $workDir = Datastore::tmpfsWorkDir('inspect');
 $probe = null;
+$seconds = null;
 
 try {
     if (is_file($archivePath) && (new Crypto7z())->extract($archivePath, $workDir, $password)) {
         $plainPath = (glob("{$workDir}/*") ?: [])[0] ?? null;
 
         if ($plainPath !== null && is_file($plainPath)) {
-            $probe = (new VideoEncoder())->probe($plainPath);
+            $encoder = new VideoEncoder();
+            $probe = $encoder->probe($plainPath);
+            $seconds = $encoder->durationSeconds($plainPath);
         }
     }
 } finally {
@@ -90,6 +93,9 @@ $measured = [
     'height' => $probe['height'],
     'fps' => $probe['fps'],
     'inspected_at' => time(),
+    // Exact, for Trim. Videos uploaded before it was recorded only know their
+    // length to the second until they are inspected.
+    ...($seconds !== null ? ['duration_ms' => (int) floor($seconds * 1000)] : []),
 ];
 
 // Re-read rather than reuse the copy from before the decrypt: that took

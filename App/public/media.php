@@ -35,10 +35,13 @@ $id = (string) ($_GET['id'] ?? '');
 $type = (string) ($_GET['type'] ?? '');
 $download = isset($_GET['download']);
 
+// Appended to the id to name the archive. `trim` is the copy a trim makes for
+// the user to play before deciding whether to keep it (VideoTrim).
 $suffixes = [
-    'thumb' => ['jpg.preview.enc', 'image/jpeg'],
-    'preview' => ['mp4.preview.enc', 'video/mp4'],
-    'video' => ['mp4.enc', 'video/mp4'],
+    'thumb' => ['.jpg.preview.enc', 'image/jpeg'],
+    'preview' => ['.mp4.preview.enc', 'video/mp4'],
+    'video' => ['.mp4.enc', 'video/mp4'],
+    'trim' => ['_trim.mp4.enc', 'video/mp4'],
 ];
 
 if ($type === 'avatar') {
@@ -61,7 +64,7 @@ if ($type === 'avatar') {
     }
 
     [$suffix, $contentType] = $suffixes[$type];
-    $archivePath = Datastore::videoDir(Session::user(), $id) . "/{$id}.{$suffix}";
+    $archivePath = Datastore::videoDir(Session::user(), $id) . "/{$id}{$suffix}";
 }
 
 if (!file_exists($archivePath)) {

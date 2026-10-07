@@ -167,6 +167,8 @@ final class VideoIngest
                 'description' => '',
                 'creators' => [VideoCreators::DEFAULT_CREATOR],
                 'length_seconds' => (int) round($duration),
+                // To the millisecond, for Trim: length_seconds is rounded.
+                'duration_ms' => (int) floor($duration * 1000),
                 'views' => 0,
                 'format' => $ext,
                 'codec' => $codec,
@@ -195,6 +197,7 @@ final class VideoIngest
                 'description' => '',
                 'creators' => $metadata['creators'],
                 'length_seconds' => $metadata['length_seconds'],
+                'duration_ms' => $metadata['duration_ms'],
                 'views' => 0,
                 'format' => $ext,
                 'codec' => $codec,

@@ -1868,3 +1868,52 @@ select option {
   accent-color: var(--accent);
   margin: 0;
 }
+
+/* ---------- Trim (Video Stats) ---------- */
+
+.trim-subject {
+  margin-top: -8px;
+}
+
+.trim-player {
+  display: block;
+  width: 100%;
+  max-height: 60vh;
+  background: #000;
+  border-radius: 8px;
+}
+
+.trim-actions {
+  display: flex;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.trim-actions form {
+  margin: 0;
+}
+
+.trim-form select {
+  max-width: 220px;
+}
+
+/* "from [ 12000 ] ms to [ 15000 ] ms", one line where there is room. Each
+   row is a .field for the input styling; only the width differs. */
+.trim-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.trim-range[hidden] {
+  display: none;
+}
+
+.field.trim-range input:not([type="checkbox"]):not([type="range"]):not([type="color"]) {
+  width: 9em;
+}
+
+.trim-range output {
+  margin: 0;
+}
