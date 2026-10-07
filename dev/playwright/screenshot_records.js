@@ -1,10 +1,11 @@
 const { chromium } = require('playwright');
+const { fixturePng } = require('./fixture_png');
 
 const BASE = process.env.BASE_URL || 'http://app:8080';
 const PASSWORD = process.env.STASH_PASSWORD || 'DS89HONPtufGDncNUoGfshCg';
 
-// A real PNG fixture to upload as a creator profile picture.
-const AVATAR = '/work/avatar_fixture.png';
+// A real PNG to upload as a creator profile picture.
+const AVATAR = fixturePng();
 
 (async () => {
   const browser = await chromium.launch();

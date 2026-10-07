@@ -3,6 +3,7 @@
 // Runs against a throwaway stash: this rewrites the preview archive, which is
 // not something to do to someone's stash to prove a point.
 const { chromium } = require('playwright');
+const { fixturePng } = require('./fixture_png');
 
 const BASE = process.env.BASE_URL || 'http://app:8080';
 const USER = process.env.PROBE_USER;
@@ -53,7 +54,7 @@ const PASS = process.env.PROBE_PASS;
   check('the served thumbnail actually changed', afterCapture !== before);
 
   // --- supply a picture instead ---
-  await page.setInputFiles('#preview-file', '/work/avatar_fixture.png');
+  await page.setInputFiles('#preview-file', fixturePng(640, 360));
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'networkidle' }),
     page.click('.preview-row:has(#preview-file) button[type="submit"]'),
