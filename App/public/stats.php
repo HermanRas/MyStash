@@ -85,7 +85,7 @@ $navActive = '';
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MyStash — Stats</title>
+<title>MyStash — Video Stats</title>
 <link rel="icon" href="assets/img/icon.png" type="image/png">
 <link rel="stylesheet" href="assets/style.css">
 </head>
@@ -94,7 +94,7 @@ $navActive = '';
 <?php require __DIR__ . '/../views/header.php'; ?>
 
 <main class="manage-layout">
-  <h1 class="page-title">Stats</h1>
+  <h1 class="page-title">Video Stats</h1>
 
   <?php if (isset($errors[$error])): ?>
     <p class="notice bad"><?= htmlspecialchars($errors[$error], ENT_QUOTES) ?></p>
