@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../src/Jobs.php';
 require_once __DIR__ . '/../src/Session.php';
 require_once __DIR__ . '/../src/VideoPreview.php';
 
+use MyStash\Jobs;
 use MyStash\Session;
 use MyStash\VideoPreview;
 
@@ -13,7 +15,10 @@ use MyStash\VideoPreview;
  *
  * Two ways in, one endpoint, because they are the same operation with
  * different sources for the picture: `source=timestamp` grabs a frame from the
- * video, `source=upload` takes an image the user chose.
+ * video, `source=upload` takes an image the user chose. `source=clip` is the
+ * odd one out: it rebuilds the hover clip rather than the image, and only
+ * starts the job that does it — the same one upload.php starts, retried by
+ * hand when that one failed.
  */
 
 Session::requireLogin();
@@ -73,6 +78,14 @@ $result = match ((string) ($_POST['source'] ?? '')) {
         $id,
         (float) ($_POST['preview_at'] ?? 0),
     ),
+
+    'clip' => (function () use ($id): array {
+        $started = Jobs::start('preview', Session::user(), $id, ['password' => Session::password()]);
+
+        return $started['ok']
+            ? ['ok' => true, 'message' => 'Building the hover preview in the background.']
+            : ['ok' => false, 'message' => $started['error']];
+    })(),
 
     default => ['ok' => false, 'message' => 'Nothing to do.'],
 };

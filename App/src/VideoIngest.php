@@ -10,9 +10,10 @@ require_once __DIR__ . '/VideoPreview.php';
 
 /**
  * Upload/ingestion pipeline (Docs/PLAN.md Phase 3, Docs/SPECIFICATIONS.md §2.3):
- * format-checks the upload, generates a preview image + silent preview clip,
- * encrypts everything into the datastore layout, and returns the index
- * summary entry to append to the user's video index.
+ * format-checks the upload, generates the preview image, encrypts the video,
+ * image and metadata into the datastore layout, and returns the index summary
+ * entry to append to the user's video index. The silent hover clip is not made
+ * here — it is a background job (see VideoPreview::buildClip).
  */
 final class VideoIngest
 {
@@ -120,18 +121,10 @@ final class VideoIngest
                 throw new \RuntimeException('No frame could be read from this video.');
             }
 
-            // The clip is a timelapse over the whole video, so unlike the
-            // preview image it doesn't start from the chosen timestamp.
-            $previewClipPath = "{$workDir}/preview.mp4";
-
-            // Checked, because the alternative is what used to happen: a false
-            // here went unnoticed and the missing file surfaced four lines
-            // later as an uncaught exception out of the encrypter, with the
-            // password in its stack trace.
-            if (!$this->encoder->buildPreviewClip($originalPath, $previewClipPath)
-                || !is_file($previewClipPath)) {
-                throw new \RuntimeException('No preview could be built from this video.');
-            }
+            // No hover clip here. Building it decodes the entire video, which
+            // on a long upload outlasted the reverse proxy and turned a
+            // successful upload into a 504. The caller starts a `preview` job
+            // for it once the entry is saved (VideoPreview::buildClip).
 
             // Both derived tags come from the file itself and are never
             // user-editable — see VideoQuality.
@@ -190,7 +183,6 @@ final class VideoIngest
             file_put_contents($metadataPath, json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
             $this->crypto->encrypt($originalPath, "{$videoDir}/{$id}.mp4.enc", $password);
-            $this->crypto->encrypt($previewClipPath, "{$videoDir}/{$id}.mp4.preview.enc", $password);
             $this->crypto->encrypt($previewImagePath, "{$videoDir}/{$id}.jpg.preview.enc", $password);
             $this->crypto->encrypt($metadataPath, "{$videoDir}/{$id}.json.enc", $password);
 

@@ -33,7 +33,7 @@ session_write_close();
 header('Content-Type: application/json');
 header('Cache-Control: no-store');
 
-if (!in_array($kind, ['convert', 'rekey'], true)) {
+if (!in_array($kind, ['convert', 'rekey', 'preview'], true)) {
     http_response_code(400);
     echo json_encode(['state' => 'none', 'message' => 'Unknown job type.']);
     exit;

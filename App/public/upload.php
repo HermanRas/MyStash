@@ -5,10 +5,12 @@ declare(strict_types=1);
 require_once __DIR__ . '/../src/Crypto7z.php';
 require_once __DIR__ . '/../src/VideoEncoder.php';
 require_once __DIR__ . '/../src/Datastore.php';
+require_once __DIR__ . '/../src/Jobs.php';
 require_once __DIR__ . '/../src/VideoIngest.php';
 require_once __DIR__ . '/../src/Session.php';
 
 use MyStash\Datastore;
+use MyStash\Jobs;
 use MyStash\Session;
 use MyStash\VideoIngest;
 
@@ -67,5 +69,23 @@ $index['videos'][] = $entry;
 
 (new Datastore())->saveIndex(Session::user(), Session::password(), $index);
 Session::setIndex($index);
+
+// The hover clip decodes the whole video, which is what used to keep this
+// request open long enough for the reverse proxy to give up and answer 504
+// over an upload that had in fact worked. It is a detached job now, started
+// only once the entry is saved so the worker always finds the video it is
+// building for. If it fails the tile simply does not play on hover, and the
+// edit screen offers to try again.
+$started = Jobs::start(
+    'preview',
+    Session::user(),
+    (string) $entry['id'],
+    ['password' => Session::password()],
+    ['message' => 'Starting…'],
+);
+
+if (!$started['ok']) {
+    error_log("MyStash upload: preview job not started: {$started['error']} ({$entry['id']})");
+}
 
 header('Location: wall.php');

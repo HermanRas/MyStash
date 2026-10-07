@@ -63,6 +63,16 @@ if (!hash_equals(Session::password(), $current)) {
 //
 // The passwords go to the worker through the job's tmpfs key file, which it
 // deletes as it reads — never on its argv, where `ps` would show them.
+// Any other job on this stash is writing archives under the *current*
+// password — a just-uploaded video's hover preview, a conversion — and one
+// that lands after the re-key has passed it is a file the new password cannot
+// open. Wait for them rather than race them.
+$other = Jobs::aliveFor(Session::user());
+
+if ($other !== null && $other !== 'rekey') {
+    $back('error=busy');
+}
+
 $started = Jobs::start(
     'rekey',
     Session::user(),

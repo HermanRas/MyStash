@@ -21,6 +21,7 @@ require_once __DIR__ . '/../src/Datastore.php';
 require_once __DIR__ . '/../src/Rekey.php';
 require_once __DIR__ . '/../src/VideoCategories.php';
 require_once __DIR__ . '/../src/VideoEncoder.php';
+require_once __DIR__ . '/../src/VideoPreview.php';
 require_once __DIR__ . '/../src/VideoQuality.php';
 require_once __DIR__ . '/../src/VideoStats.php';
 
@@ -30,6 +31,7 @@ use MyStash\Jobs;
 use MyStash\Rekey;
 use MyStash\VideoCategories;
 use MyStash\VideoEncoder;
+use MyStash\VideoPreview;
 use MyStash\VideoQuality;
 use MyStash\VideoStats;
 
@@ -66,6 +68,7 @@ try {
     match ((string) $record['kind']) {
         'convert' => runConvert($id, $record, $secrets),
         'rekey' => runRekey($id, $record, $secrets),
+        'preview' => runPreview($id, $record, $secrets),
         default => Jobs::finish($id, false, 'Unknown job type.'),
     };
 } catch (\Throwable $error) {
@@ -248,6 +251,33 @@ function runConvert(string $id, array $record, array $secrets): void
     } finally {
         Datastore::wipe($workDir);
     }
+}
+
+/**
+ * Build one video's hover clip after it has been uploaded.
+ *
+ * Split out of the upload request because it decodes the whole video, which on
+ * a long one kept that request open past the reverse proxy's timeout. The
+ * video, its thumbnail and its index entry already exist by the time this
+ * runs; all of the work is in VideoPreview::buildClip().
+ *
+ * @param array<string, mixed> $record
+ * @param array<string, string> $secrets
+ */
+function runPreview(string $id, array $record, array $secrets): void
+{
+    $result = (new VideoPreview())->buildClip(
+        (string) $record['user'],
+        (string) $secrets['password'],
+        (string) $record['target'],
+        static fn(string $stage) => Jobs::update($id, ['message' => $stage]),
+    );
+
+    if (!$result['ok']) {
+        error_log("MyStash preview {$record['target']} for {$record['user']}: {$result['message']}");
+    }
+
+    Jobs::finish($id, $result['ok'], $result['message']);
 }
 
 /**

@@ -48,6 +48,12 @@ $converting = $convertJob !== null && $convertJob['state'] === Jobs::RUNNING;
 $editing = isset($_GET['edit']);
 $assignments = (new VideoCategories())->load(Session::user(), Session::password(), $id);
 
+// The hover clip is built by a job after upload rather than during it, so a
+// video can exist without one for a while — or for good, if that job failed.
+$previewJob = Jobs::read(Jobs::id('preview', Session::user(), $id));
+$buildingClip = $previewJob !== null && $previewJob['state'] === Jobs::RUNNING;
+$hasClip = is_file(Datastore::videoDir(Session::user(), $id) . "/{$id}.mp4.preview.enc");
+
 // Where the current preview came from (3.9). Only read while editing: the
 // watch page does not need it, and this opens the per-video metadata archive.
 $previewCapture = null;
@@ -315,6 +321,39 @@ $navActive = 'videos';
           </div>
         </div>
       </div>
+
+      <div class="section-title">Hover Preview</div>
+      <?php if ($buildingClip): ?>
+        <div class="card job-card indeterminate" id="job-card"
+             data-kind="preview" data-target="<?= htmlspecialchars($id, ENT_QUOTES) ?>">
+          <div class="progress"><div class="progress-bar" id="job-bar"></div></div>
+          <p class="hint job-message" id="job-message">
+            <?= htmlspecialchars((string) $previewJob['message'], ENT_QUOTES) ?>
+          </p>
+          <p class="hint" style="margin-bottom:0;">
+            The timelapse that plays when you hover over the tile is built in the
+            background after upload. The video is already safely stored.
+          </p>
+        </div>
+      <?php else: ?>
+        <div class="card">
+          <?php if ($previewJob !== null && $previewJob['state'] === Jobs::FAILED): ?>
+            <p class="hint" style="color:#ff6b6b; margin-top:0;">
+              <?= htmlspecialchars((string) $previewJob['message'], ENT_QUOTES) ?>
+            </p>
+          <?php endif; ?>
+          <form action="video_preview.php" method="post" class="preview-row">
+            <input type="hidden" name="id" value="<?= htmlspecialchars($id, ENT_QUOTES) ?>">
+            <input type="hidden" name="source" value="clip">
+            <p class="hint" style="margin:0; flex:1;">
+              <?= $hasClip
+                  ? 'The tile plays a timelapse of the whole video on hover.'
+                  : 'This video has no hover preview yet.' ?>
+            </p>
+            <button type="submit" class="btn secondary"><?= $hasClip ? 'Rebuild' : 'Build preview' ?></button>
+          </form>
+        </div>
+      <?php endif; ?>
 
       <div class="section-title">Categories</div>
       <div class="card">

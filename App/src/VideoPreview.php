@@ -122,6 +122,79 @@ final class VideoPreview
     }
 
     /**
+     * Builds the hover timelapse clip, `{ID}.mp4.preview.enc`, from the stored
+     * video.
+     *
+     * This used to happen inside the upload request, and it is the slowest
+     * part of ingestion by far: the sampling pass decodes the *whole* video to
+     * pick one frame every 15 seconds. On a long upload that alone outlasted
+     * the reverse proxy's read timeout, and the browser was told the upload
+     * had failed with a 504 while PHP carried on regardless. So upload.php now
+     * stores the video, its thumbnail and metadata, and hands this to a
+     * detached `preview` job (bin/job_worker.php). The tile is complete without
+     * it — it just does not play on hover until the job finishes.
+     *
+     * @param callable(string): void|null $onStage told what is happening, for
+     *        the job record
+     * @return array{ok: bool, message: string}
+     */
+    public function buildClip(string $user, string $password, string $id, ?callable $onStage = null): array
+    {
+        $videoDir = Datastore::videoDir($user, $id);
+        $videoArchive = "{$videoDir}/{$id}.mp4.enc";
+
+        if (!is_file($videoArchive)) {
+            return ['ok' => false, 'message' => 'There is no video file to build a preview from.'];
+        }
+
+        $workDir = Datastore::tmpfsWorkDir('previewclip');
+
+        try {
+            $onStage && $onStage('Decrypting…');
+
+            $extractDir = "{$workDir}/extract";
+
+            if (!$this->crypto->extract($videoArchive, $extractDir, $password)) {
+                return ['ok' => false, 'message' => 'The video could not be opened.'];
+            }
+
+            $video = glob("{$extractDir}/*")[0] ?? null;
+
+            if ($video === null) {
+                return ['ok' => false, 'message' => 'The video could not be opened.'];
+            }
+
+            $onStage && $onStage('Building the hover preview…');
+
+            $clipPath = "{$workDir}/preview.mp4";
+
+            if (!$this->encoder->buildPreviewClip($video, $clipPath) || !is_file($clipPath)) {
+                return ['ok' => false, 'message' => 'No preview could be built from this video.'];
+            }
+
+            $onStage && $onStage('Encrypting…');
+
+            // The video may have been deleted while the clip was being built.
+            // 7z creates missing parent directories, so writing regardless
+            // would bring back a directory holding nothing but a preview —
+            // invisible to every screen and impossible to delete from one.
+            if (!is_dir($videoDir)) {
+                return ['ok' => false, 'message' => 'The video was deleted before its preview was ready.'];
+            }
+
+            // replace(), so a rebuild over an existing clip never leaves the
+            // tile without one if it fails part way (4.29).
+            if (!$this->crypto->replace($clipPath, "{$videoDir}/{$id}.mp4.preview.enc", $password)) {
+                return ['ok' => false, 'message' => 'The preview could not be saved.'];
+            }
+
+            return ['ok' => true, 'message' => 'Hover preview ready.'];
+        } finally {
+            Datastore::wipe($workDir);
+        }
+    }
+
+    /**
      * Replaces the preview with an image the user supplied.
      *
      * @return array{ok: bool, message: string}

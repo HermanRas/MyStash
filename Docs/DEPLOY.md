@@ -237,6 +237,15 @@ server {
         # browser, so seeking in a long video stalls until the entire file
         # has been decrypted.
         proxy_buffering off;
+
+        # nginx gives up on a response after 60s by default. Nothing in the app
+        # is meant to take that long any more — the hover preview, the slow
+        # part of an upload, is a background job — but encrypting a multi-GB
+        # upload into the stash still happens inside the request, and a 504
+        # there tells the user the upload failed when it did not. Match the
+        # app's own 600s ceiling (App/nginx.conf, App/php-fpm.conf).
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
     }
 }
 ```

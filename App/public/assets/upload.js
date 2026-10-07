@@ -10,9 +10,9 @@
  * An upload has two halves and only the first has a percentage. Sending the
  * bytes is measurable; what happens afterwards — ffmpeg reading the duration,
  * grabbing the preview frame, 7z encrypting the video into the datastore — is
- * work the browser cannot see and which, on a large video, takes considerably
- * longer than the transfer did. So the card switches to the same sweeping
- * indeterminate bar the conversion job uses (assets/job.js) rather than
+ * work the browser cannot see. (The hover clip, which decodes the whole video,
+ * is no longer part of it: that is a background job, see upload.php.) So the
+ * card switches to the same sweeping indeterminate bar the conversion job uses (assets/job.js) rather than
  * sitting at 100% looking hung.
  */
 (function () {
@@ -126,9 +126,8 @@
       card.classList.add('indeterminate');
       message.textContent = 'Processing video';
       detail.textContent =
-        'Reading the video, capturing the preview and encrypting it into your '
-        + 'stash. On a long video this takes a while — leaving this page now '
-        + 'would abandon the upload.';
+        'Reading the video, capturing the thumbnail and encrypting it into your '
+        + 'stash. The hover preview is built afterwards in the background.';
     });
 
     xhr.addEventListener('load', () => {

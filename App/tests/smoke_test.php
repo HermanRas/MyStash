@@ -770,6 +770,25 @@ $previewArchive = Datastore::videoDir($previewUser, $videoId) . "/{$videoId}.jpg
 
 step('the upload produced a preview archive', is_file($previewArchive));
 
+// The hover clip is a background job now (upload.php starts it), so ingestion
+// must *not* make one — that is the work that held the upload request open
+// past the proxy's timeout. The job's body is VideoPreview::buildClip().
+$clipArchive = Datastore::videoDir($previewUser, $videoId) . "/{$videoId}.mp4.preview.enc";
+step('ingestion leaves the hover clip to the background job', !is_file($clipArchive));
+
+$clip = (new VideoPreview())->buildClip($previewUser, $previewKey, $videoId);
+step('the preview job builds the hover clip (' . $clip['message'] . ')', $clip['ok'] && is_file($clipArchive));
+
+$clipOut = Datastore::tmpfsWorkDir('smokeclip');
+step('...and it decrypts to a playable clip',
+    (new Crypto7z())->extract($clipArchive, $clipOut, $previewKey)
+    && ((new VideoEncoder())->durationSeconds(glob("{$clipOut}/*")[0] ?? '') ?? 0) > 0);
+Datastore::wipe($clipOut);
+
+$gone = (new VideoPreview())->buildClip($previewUser, $previewKey, '9999');
+step('a preview job for a video that no longer exists fails cleanly', $gone['ok'] === false
+    && !is_dir(Datastore::videoDir($previewUser, '9999')));
+
 // The bytes to compare every later assertion against.
 $archiveHash = static fn(): string => (string) hash_file('sha256', $previewArchive);
 $originalHash = $archiveHash();
