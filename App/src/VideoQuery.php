@@ -33,6 +33,23 @@ final class VideoQuery
 
     public const DEFAULT_SORT = 'uploaded_desc';
 
+    /**
+     * Video types by running time, in filter order: value => label. A short is
+     * under 4 minutes, a movie 30 minutes or more, and a video everything in
+     * between — so exactly 4:00 is a video and exactly 30:00 a movie.
+     */
+    public const TYPES = [
+        'short' => 'Shorts',
+        'video' => 'Videos',
+        'movie' => 'Movies',
+    ];
+
+    public const SHORT_MAX_SECONDS = 4 * 60;
+    public const MOVIE_MIN_SECONDS = 30 * 60;
+
+    /** What the wall shows when it opens: everything but shorts. */
+    public const DEFAULT_TYPES = ['video', 'movie'];
+
     /** Upper end of the length slider; at the maximum it means "no limit". */
     public const MAX_LENGTH_MINUTES = 180;
 
@@ -54,6 +71,7 @@ final class VideoQuery
     /**
      * @param list<string> $categories
      * @param list<string> $creators
+     * @param list<string> $types
      */
     private function __construct(
         public readonly array $categories,
@@ -65,6 +83,7 @@ final class VideoQuery
         public readonly string $gender,
         public readonly string $sort,
         public readonly string $search,
+        public readonly array $types,
     ) {
     }
 
@@ -77,6 +96,17 @@ final class VideoQuery
 
         $categories = $names('category');
         $creators = $names('creator');
+
+        // The filter form always sends an empty `type[]`, so a submitted form
+        // with every box unticked is told apart from a wall opened bare: only
+        // the bare wall gets the default. Nothing ticked means no type filter,
+        // as it does for categories and creators.
+        if (array_key_exists('type', $query)) {
+            $types = array_values(array_intersect(array_keys(self::TYPES), $names('type')));
+            $types = $types === [] ? array_keys(self::TYPES) : $types;
+        } else {
+            $types = self::DEFAULT_TYPES;
+        }
 
         $min = max(0, (int) ($query['len_min'] ?? 0));
         $max = (int) ($query['len_max'] ?? self::MAX_LENGTH_MINUTES);
@@ -97,7 +127,7 @@ final class VideoQuery
         $search = is_array($query['q'] ?? null) ? '' : (string) ($query['q'] ?? '');
         $search = mb_substr(trim(preg_replace('/\s+/u', ' ', $search) ?? ''), 0, self::MAX_SEARCH_LENGTH);
 
-        return new self($categories, $creators, $min, $max, $minAge, $maxAge, $gender, $sort, $search);
+        return new self($categories, $creators, $min, $max, $minAge, $maxAge, $gender, $sort, $search, $types);
     }
 
     public function isFiltered(): bool
@@ -107,7 +137,32 @@ final class VideoQuery
             || $this->search !== ''
             || $this->minMinutes > 0
             || $this->maxMinutes < self::MAX_LENGTH_MINUTES
+            || $this->filtersByType()
             || $this->filtersByCreatorAttributes();
+    }
+
+    /**
+     * True when some type is hidden — which includes the bare wall, since it
+     * opens with shorts hidden and its count should say so.
+     */
+    public function filtersByType(): bool
+    {
+        return count($this->types) < count(self::TYPES);
+    }
+
+    public function hasType(string $type): bool
+    {
+        return in_array($type, $this->types, true);
+    }
+
+    /** short, video or movie, from a running time in seconds. */
+    public static function typeOf(int $seconds): string
+    {
+        return match (true) {
+            $seconds < self::SHORT_MAX_SECONDS => 'short',
+            $seconds < self::MOVIE_MIN_SECONDS => 'video',
+            default => 'movie',
+        };
     }
 
     /**
@@ -238,6 +293,10 @@ final class VideoQuery
     {
         $videos = array_values(array_filter($videos, function (array $video) use ($creators): bool {
             if (!$this->matchesSearch($video)) {
+                return false;
+            }
+
+            if (!$this->hasType(self::typeOf((int) ($video['length_seconds'] ?? 0)))) {
                 return false;
             }
 

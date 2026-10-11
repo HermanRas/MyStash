@@ -54,6 +54,7 @@ $sortHref = static function (string $sort) use ($query): string {
         ], static fn(string $value) => $value !== ''),
         'category' => $query->categories,
         'creator' => $query->creators,
+        'type' => $query->types,
         'len_min' => $query->minMinutes,
         'len_max' => $query->maxMinutes,
         'age_min' => $query->minAge,
@@ -175,6 +176,24 @@ $uploadLimit = min(
       <?php /* Native <details> accordions — no JS needed. Categories is the
                one open by default; the others remember nothing between loads
                beyond whether a filter in them is active. */ ?>
+      <?php /* Type is a band of running time (VideoQuery::typeOf). The empty
+               value is always sent, so unticking every box reads as a choice
+               rather than as a bare wall, which would bring the default back.
+               Collapsed while it holds the default, open once it is changed. */ ?>
+      <details class="filter-section" <?= $query->types !== VideoQuery::DEFAULT_TYPES ? 'open' : '' ?>>
+        <summary><span class="filter-summary-label"><img class="filter-icon" src="assets/img/icons/videos.png" alt="">Type</span></summary>
+        <input type="hidden" name="type[]" value="">
+        <?php foreach (VideoQuery::TYPES as $value => $label): ?>
+          <div class="filter-row">
+            <label class="check-row">
+              <input type="checkbox" name="type[]" value="<?= $value ?>"
+                     <?= $query->hasType($value) ? 'checked' : '' ?>>
+              <?= $label ?>
+            </label>
+          </div>
+        <?php endforeach; ?>
+      </details>
+
       <details class="filter-section" open>
         <summary><span class="filter-summary-label"><img class="filter-icon" src="assets/img/icons/tag.png" alt="">Categories</span></summary>
         <?php foreach ($categories as $name => $color): ?>
@@ -260,7 +279,7 @@ $uploadLimit = min(
         <?php if ($query->search !== ''): ?>
           matching <strong class="wall-term"><?= htmlspecialchars($query->search, ENT_QUOTES) ?></strong><?php
             /* The filter panel may be narrowing the search further. */
-            ?><?= $query->categories !== [] || $query->creators !== [] || $query->minMinutes > 0 || $query->maxMinutes < VideoQuery::MAX_LENGTH_MINUTES || $query->filtersByCreatorAttributes() ? ', filtered' : '' ?>
+            ?><?= $query->categories !== [] || $query->creators !== [] || $query->minMinutes > 0 || $query->maxMinutes < VideoQuery::MAX_LENGTH_MINUTES || $query->filtersByType() || $query->filtersByCreatorAttributes() ? ', filtered' : '' ?>
         <?php elseif ($query->isFiltered()): ?>
           (filtered)
         <?php endif; ?>
@@ -314,7 +333,7 @@ $uploadLimit = min(
             Nothing matches <strong class="wall-term"><?= htmlspecialchars($query->search, ENT_QUOTES) ?></strong>
             in any title, creator or category tag.
             <a href="wall.php" style="color:var(--accent);">Clear the search</a>
-          <?php elseif ($query->isFiltered()): ?>
+          <?php elseif ($query->isFiltered() && $total > 0): ?>
             No videos match these filters.
           <?php else: ?>
             No videos yet — upload one to get started.

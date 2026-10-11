@@ -260,13 +260,15 @@ step(
 );
 
 // Search (Docs/PLAN.md 5.1) — pure logic over index entries, no stash needed.
+// Lengths are all in the Videos band, so the wall's default (shorts hidden)
+// does not get in the way of what these cases are about.
 $library = [
     ['id' => '1', 'title' => 'Skateboarding at dusk', 'creators' => ['Jamie K.'],
-     'categories' => ['Sport', 'Outdoors'], 'length_seconds' => 60, 'views' => 0, 'uploaded_at' => '2026-01-01'],
+     'categories' => ['Sport', 'Outdoors'], 'length_seconds' => 600, 'views' => 0, 'uploaded_at' => '2026-01-01'],
     ['id' => '2', 'title' => 'Office slip and fall', 'creators' => ['default', 'Alex R.'],
-     'categories' => ['Personal'], 'length_seconds' => 62, 'views' => 3, 'uploaded_at' => '2026-02-01'],
+     'categories' => ['Personal'], 'length_seconds' => 620, 'views' => 3, 'uploaded_at' => '2026-02-01'],
     ['id' => '3', 'title' => 'Beach day', 'creators' => ['Alex R.'],
-     'categories' => ['Outdoors'], 'length_seconds' => 120, 'views' => 9, 'uploaded_at' => '2026-03-01'],
+     'categories' => ['Outdoors'], 'length_seconds' => 1200, 'views' => 9, 'uploaded_at' => '2026-03-01'],
 ];
 
 $search = static function (string $term) use ($library): array {
@@ -342,7 +344,27 @@ step(
 );
 
 step('a search counts as a filter', VideoQuery::fromRequest(['q' => 'x'])->isFiltered());
-step('a bare wall is not filtered', !VideoQuery::fromRequest([])->isFiltered());
+step('a bare wall counts as filtered, since it hides shorts', VideoQuery::fromRequest([])->isFiltered());
+step('every type ticked is not filtered', !VideoQuery::fromRequest(['type' => ['', 'short', 'video', 'movie']])->isFiltered());
+
+// Type (shorts / videos / movies by running time).
+step(
+    'type boundaries: 3:59 short, 4:00 video, 29:59 video, 30:00 movie',
+    VideoQuery::typeOf(239) === 'short' && VideoQuery::typeOf(240) === 'video'
+        && VideoQuery::typeOf(1799) === 'video' && VideoQuery::typeOf(1800) === 'movie',
+);
+
+$typed = [
+    ['id' => 's', 'title' => 'S', 'categories' => [], 'length_seconds' => 30, 'views' => 0, 'uploaded_at' => '2026-03-01'],
+    ['id' => 'v', 'title' => 'V', 'categories' => [], 'length_seconds' => 600, 'views' => 0, 'uploaded_at' => '2026-02-01'],
+    ['id' => 'm', 'title' => 'M', 'categories' => [], 'length_seconds' => 5400, 'views' => 0, 'uploaded_at' => '2026-01-01'],
+];
+$typeIds = static fn(array $request): array => array_column(VideoQuery::fromRequest($request)->apply($typed), 'id');
+
+step('a bare wall shows videos and movies, not shorts', $typeIds([]) === ['v', 'm']);
+step('ticking only Shorts shows only shorts', $typeIds(['type' => ['', 'short']]) === ['s']);
+step('unticking every type shows everything', $typeIds(['type' => ['']]) === ['s', 'v', 'm']);
+step('an unknown type is ignored', $typeIds(['type' => ['', 'bogus', 'movie']]) === ['m']);
 
 // Legacy entries store a single `creator` string rather than a `creators` list.
 step(
@@ -350,7 +372,7 @@ step(
     array_column(
         VideoQuery::fromRequest(['q' => 'morgan'])->apply([
             ['id' => '9', 'title' => 'Old entry', 'creator' => 'Morgan P.',
-             'categories' => [], 'length_seconds' => 10, 'views' => 0],
+             'categories' => [], 'length_seconds' => 600, 'views' => 0],
         ]),
         'id',
     ) === ['9'],
@@ -492,7 +514,7 @@ step('age and gender compose with the other filters',
 step('an age filter counts as a filter',
     VideoQuery::fromRequest(['age_min' => 25])->isFiltered()
         && VideoQuery::fromRequest(['gender' => 'Female'])->isFiltered()
-        && !VideoQuery::fromRequest(['age_min' => VideoQuery::MIN_AGE, 'age_max' => VideoQuery::MAX_AGE])->isFiltered());
+        && !VideoQuery::fromRequest(['age_min' => VideoQuery::MIN_AGE, 'age_max' => VideoQuery::MAX_AGE, 'type' => array_keys(VideoQuery::TYPES)])->isFiltered());
 
 $ages = VideoQuery::fromRequest(['age_min' => 40, 'age_max' => 20]);
 step('an upside-down age range is corrected rather than matching nothing',

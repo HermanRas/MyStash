@@ -120,7 +120,7 @@ The index also keeps a **de-duplicated copy of each video's category names** on 
 ### 2.8 Search / Filter / Sort
 
 - **Search:** videos by title, creator, category tags.
-- **Filter:** videos by category, creator and length range; creators by age, gender, other details.
+- **Filter:** videos by type, category, creator and length range; creators by age, gender, other details.
 - **Sort:** videos by title, length, views or upload date.
 
 **Sort options** (the wall's sort menu, right of the result count):
@@ -132,9 +132,11 @@ The index also keeps a **de-duplicated copy of each video's category names** on 
 | Length | short → long, long → short |
 | Views | min → max, max → min |
 
-Filtering and sorting are applied **server-side**, against the already-decrypted index, and carried in the query string (`?category[]=…&creator[]=…&len_min=…&len_max=…&sort=…`). That means a filtered wall renders exactly the tiles it should rather than hiding rows in the browser, the two compose with each other, and any filter can be linked to — which is how clicking a category on the Categories screen opens a filtered wall. `All Videos` in the top nav links to the bare wall URL, so it doubles as the reset. See `App/src/VideoQuery.php`.
+Filtering and sorting are applied **server-side**, against the already-decrypted index, and carried in the query string (`?type[]=…&category[]=…&creator[]=…&len_min=…&len_max=…&sort=…`). That means a filtered wall renders exactly the tiles it should rather than hiding rows in the browser, the two compose with each other, and any filter can be linked to — which is how clicking a category on the Categories screen opens a filtered wall. `All Videos` in the top nav links to the bare wall URL, so it doubles as the reset. See `App/src/VideoQuery.php`.
 
 The top of the length slider is an **open end**, not a ceiling: at maximum it reads "any" and stops filtering on length.
+
+**Type** sorts every video into one of three bands by running time: **Shorts** (under 4:00), **Videos** (4:00 up to 30:00) and **Movies** (30:00 and over) — so exactly 4:00 is a video and exactly 30:00 a movie. The wall opens with **Videos and Movies ticked and Shorts hidden**; that applies to any wall URL without a `type`, including `All Videos` and the Categories screen's links, and the count line says "(filtered)" because of it. The filter form always sends an empty `type[]`, so a form with every box unticked is told apart from a bare wall — and, like categories and creators, nothing ticked means no type filter. The Type group stays collapsed while it holds the default.
 
 ### 2.9 Playlists
 
