@@ -1,4 +1,4 @@
-FROM php:8.3-fpm
+FROM php:8.3.36-fpm
 
 # nginx lives in this image too. It is a second process rather than a second
 # container because the two are not independently useful: nginx here serves
