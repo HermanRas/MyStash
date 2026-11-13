@@ -125,13 +125,14 @@ The index also keeps a **de-duplicated copy of each video's category names** on 
 
 - **Search:** videos by title, creator, category tags.
 - **Filter:** videos by type, category, creator and length range; creators by age, gender, other details.
-- **Sort:** videos by title, length, views or upload date.
+- **Sort:** videos by creator, title, length, views or upload date.
 
 **Sort options** (the wall's sort menu, right of the result count):
 
 | Sort | Order |
 | --- | --- |
-| Uploaded | new → old *(default)*, old → new |
+| Creator | A → Z *(default)*, Z → A — on the full credit list, title breaks ties |
+| Uploaded | new → old, old → new |
 | Title | A → Z, Z → A |
 | Length | short → long, long → short |
 | Views | min → max, max → min |

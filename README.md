@@ -1,4 +1,4 @@
-# MyStash v2.0.0
+# MyStash v2.1.0
 
 ![MyStash](Docs/Assets/Banner.jpg)
 

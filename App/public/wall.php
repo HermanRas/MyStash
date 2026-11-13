@@ -34,10 +34,10 @@ ksort($genders);
 
 require_once __DIR__ . '/../views/format.php';
 
-// A→Z / Z→A for the title sorts, 0→9 / 9→0 for the numeric ones.
+// A→Z / Z→A for the title and creator sorts, 0→9 / 9→0 for the numeric ones.
 $sortIcon = match ($query->sort) {
-    'title_asc' => 'sort-az',
-    'title_desc' => 'sort-za',
+    'title_asc', 'creator_asc' => 'sort-az',
+    'title_desc', 'creator_desc' => 'sort-za',
     default => str_ends_with($query->sort, '_asc') ? 'sort-09' : 'sort-90',
 };
 

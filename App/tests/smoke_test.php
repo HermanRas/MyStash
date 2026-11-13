@@ -396,6 +396,22 @@ step(
 );
 
 step(
+    'the wall sorts by creator A->Z by default, title breaking ties',
+    VideoQuery::fromRequest([])->sort === 'creator_asc'
+        && array_column(VideoQuery::fromRequest([])->apply([
+            ...$library,
+            ['id' => '4', 'title' => 'Aardvarks', 'creators' => ['Alex R.'], 'length_seconds' => 600, 'views' => 0],
+        ]), 'id') === ['4', '3', '2', '1'],
+);
+step(
+    'creator Z->A reverses the creators but keeps titles A->Z within one',
+    array_column(VideoQuery::fromRequest(['sort' => 'creator_desc'])->apply([
+        ...$library,
+        ['id' => '4', 'title' => 'Aardvarks', 'creators' => ['Alex R.'], 'length_seconds' => 600, 'views' => 0],
+    ]), 'id') === ['1', '2', '4', '3'],
+);
+
+step(
     'search composes with sort (views min->max)',
     array_column(
         VideoQuery::fromRequest(['q' => 'alex', 'sort' => 'views_asc'])->apply($library),

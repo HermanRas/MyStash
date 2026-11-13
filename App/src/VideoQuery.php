@@ -21,6 +21,8 @@ final class VideoQuery
      * Sort options, in menu order: value => label.
      */
     public const SORTS = [
+        'creator_asc' => 'Creator: A → Z',
+        'creator_desc' => 'Creator: Z → A',
         'uploaded_desc' => 'Uploaded: new → old',
         'uploaded_asc' => 'Uploaded: old → new',
         'title_asc' => 'Title: A → Z',
@@ -31,7 +33,7 @@ final class VideoQuery
         'views_asc' => 'Views: min → max',
     ];
 
-    public const DEFAULT_SORT = 'uploaded_desc';
+    public const DEFAULT_SORT = 'creator_asc';
 
     /**
      * Video types by running time, in filter order: value => label. A short is
@@ -334,7 +336,16 @@ final class VideoQuery
 
     private function comparator(): callable
     {
+        // A video may credit several creators; it sorts on the list as the card
+        // shows it ("Alex R., Jamie K."), with the title settling ties so one
+        // creator's videos read A → Z within their run.
+        $byCreator = static fn($a, $b) => strcasecmp(VideoCreators::label($a), VideoCreators::label($b))
+            ?: strcasecmp($a['title'], $b['title']);
+
         return match ($this->sort) {
+            'creator_asc' => $byCreator,
+            'creator_desc' => static fn($a, $b) => strcasecmp(VideoCreators::label($b), VideoCreators::label($a))
+                ?: strcasecmp($a['title'], $b['title']),
             'title_asc' => static fn($a, $b) => strcasecmp($a['title'], $b['title']),
             'title_desc' => static fn($a, $b) => strcasecmp($b['title'], $a['title']),
             'length_asc' => static fn($a, $b) => $a['length_seconds'] <=> $b['length_seconds'],
@@ -344,7 +355,8 @@ final class VideoQuery
             // Entries predating uploaded_at have no date to sort on; they sort
             // oldest either way rather than jumping to the top of the wall.
             'uploaded_asc' => static fn($a, $b) => ($a['uploaded_at'] ?? '') <=> ($b['uploaded_at'] ?? ''),
-            default => static fn($a, $b) => ($b['uploaded_at'] ?? '') <=> ($a['uploaded_at'] ?? ''),
+            'uploaded_desc' => static fn($a, $b) => ($b['uploaded_at'] ?? '') <=> ($a['uploaded_at'] ?? ''),
+            default => $byCreator,
         };
     }
 }
