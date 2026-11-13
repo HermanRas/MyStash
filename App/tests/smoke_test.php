@@ -452,7 +452,12 @@ $typed = [
     ['id' => 'v', 'title' => 'V', 'categories' => [], 'length_seconds' => 600, 'views' => 0, 'uploaded_at' => '2026-02-01'],
     ['id' => 'm', 'title' => 'M', 'categories' => [], 'length_seconds' => 5400, 'views' => 0, 'uploaded_at' => '2026-01-01'],
 ];
-$typeIds = static fn(array $request): array => array_column(VideoQuery::fromRequest($request)->apply($typed), 'id');
+// Pinned to newest-first: these are about which types show, and the fixtures
+// are listed in upload order, not creator order.
+$typeIds = static fn(array $request): array => array_column(
+    VideoQuery::fromRequest($request + ['sort' => 'uploaded_desc'])->apply($typed),
+    'id',
+);
 
 step('a bare wall shows videos and movies, not shorts', $typeIds([]) === ['v', 'm']);
 step('ticking only Shorts shows only shorts', $typeIds(['type' => ['', 'short']]) === ['s']);
